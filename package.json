@@ -9,24 +9,24 @@
     "tailwind": "npx tailwindcss -i ./public/css/input.css -o ./public/css/output.css --watch"
   },
   "dependencies": {
-    "express": "~4.16.1",
-    "ejs": "~2.6.1",
-    "socket.io": "^4.7.5",
-    "mongoose": "^8.3.2",
     "body-parser": "^1.20.2",
-    "multer": "^1.4.5-lts.1",
-    "dotenv": "^16.4.5",
     "cookie-parser": "~1.4.4",
-    "morgan": "~1.9.1",
     "debug": "~2.6.9",
-    "http-errors": "~1.6.3"
+    "dotenv": "^16.4.5",
+    "ejs": "~2.6.1",
+    "express": "~4.16.1",
+    "http-errors": "~1.6.3",
+    "mongoose": "^8.3.2",
+    "morgan": "~1.9.1",
+    "multer": "^1.4.5-lts.1",
+    "socket.io": "^4.7.5"
   },
   "devDependencies": {
-    "nodemon": "^3.0.1",
-    "tailwindcss": "^3.4.1",
     "autoprefixer": "^10.4.19",
+    "daisyui": "^4.10.1",
+    "nodemon": "^3.1.10",
     "postcss": "^8.4.38",
-    "daisyui": "^4.10.1"
+    "tailwindcss": "^3.4.1"
   },
   "engines": {
     "node": ">=14.0.0"
