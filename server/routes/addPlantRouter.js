@@ -5,7 +5,7 @@
  */
 
 var express = require('express');
-const AddPlant = require('../models/add_plant_model');
+const AddPlant = require('../models/addplantModel');
 const upload = require('./multer.config');
 
 var router = express.Router();
