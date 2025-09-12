@@ -5,7 +5,7 @@
  */
 
 var express = require('express');
-const ChatMessage = require('../models/chat_model');
+const ChatMessage = require('../models/chatModel');
 
 var router = express.Router();
 
