@@ -15,6 +15,15 @@ app.set('view engine', 'ejs');
 
 // Middleware
 app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
+// Routes
+const addPlantRouter = require('./server/routes/addPlantRouter');
+const chatRouter = require('./server/routes/chatRouter');
+
+app.use('/api', addPlantRouter);
+app.use('/api', chatRouter);
 
 // Root route
 app.get("/", (req, res) => {
