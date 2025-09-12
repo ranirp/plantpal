@@ -21,5 +21,5 @@ let AddPlantSchema = new Schema({
     createdAt: { type: Date, default: Date.now }
 });
 
-let AddPlant = mongoose.model('AddPlant', AddPlantSchema);
+let AddPlant = mongoose.model('addPlants', AddPlantSchema);
 module.exports = AddPlant;
