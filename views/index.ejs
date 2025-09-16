@@ -1,9 +1,94 @@
-<!DOCTYPE html>
-<html>
-    <head>
-        <title><%= title %></title>
-    </head>
-    <body>
+<%#
+    Index Page — Plant Sharing Community
+    Displays shared plants with client-side sorting and filtering controls.
+%>
+
+<div class="row mb-4">
+    <div class="col-md-6">
         <h1>🌱 Welcome to the Plant Sharing Community</h1>
-    </body>
-</html>
+    </div>
+    <div class="col-md-6">
+        <!-- Sorting Controls-->
+        <div class="d-flex gap-2 justify-content-end">
+            <select class="form-select style='width: auto;'" onchange="sortPlants(this.value)">
+                <option value="date">Sort By Date</option>
+                <option value="type">Sort By Type</option>
+            </select>
+            <select class="form-select" style="width: auto;" onchange="filterPlants(this.value)">
+                <option value="">All Types</option>
+                <option value="Succulent">Succulents</option>
+                <option value="fern">Ferns</option>
+                <option value="flowering">Flowering</option>
+                <option value="herb">Herbs</option>
+                <option value="houseplant">Houseplants</option>
+                <option value="vegetable">Vegetables</option>
+                <option value="other">Other</option>
+            </select>              
+        </div>
+    </div>
+</div>
+
+<!-- Plant Grid --->
+<div class="row" id="plantsGrid">
+    <% if (plants && plants.length > 0) { %>
+        <% plants.forEach(plant => { %>
+            <div class="col-md-4 mb-4 plant-card" data-type="<%= plant.type %>">
+                <div class="card h-100">
+                    <% if (plant.photo) { %>
+                        <img src="/uploads/<%= plant.photo %>" class="card-img-top" alt="<%= plant.plantName %>" style="height: 200px; object-fit: cover;">
+                    <% } else { %>
+                        <div class="card-img-top bg-light d-flex align-items-center justify-content-center" style="height: 200px;">
+                            <span class="text-muted">No Photo</span>
+                        </div>
+                    <% } %>
+                    <div class="card-body">
+                        <h5 class="card-title"><%= plant.plantName %></h5>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                <strong>Type:</strong> <%= plant.type.charAt(0).toUpperCase() + plant.type.slice(1) %><br>
+                                <strong>By:</strong> <%= plant.nickname %><br>
+                                <strong>Added:</strong> <%= new Date(plant.createdAt).toLocaleDateString() %>
+                            </small>
+                        </p>
+                        <a href="/plants/<%= plant._id %>" class="btn btn-outline-success">View Details</a>
+                    </div>
+                </div>
+            </div>
+        <% }) %>
+    <% } else { %>
+        <div class="col-12 text-center py-5">
+            <img src="/images/no_plant.svg" alt="No plants" class="mb-3" style="width: 200px;">
+            <h3 class="text-muted">No plants added yet</h3>
+            <p class="text-muted">Be the first to share a plant!</p>
+            <a href="/plants/new" class="btn btn-success">Add your first plant</a>
+        </div>
+    <% } %>
+</div>
+
+<script>
+    function sortPlants(sortBy) {
+        const grid = document.getElementById('plantsGrid');
+        const cards = Array.from(grid.querySelectorAll('.plant-card'));
+
+        cards.sort((a, b) => {
+            if (sortBy === 'type') {
+                return a.dataset.type.localeCompare(b.dataset.type);
+            } else {
+                return new Date(b.querySelector('.card-text').textContent.split('Added: ')[1]) - 
+                        new Date(a.querySelector('.card-text').textContent.split('Added: ')[1]);
+            }
+        });
+        cards.forEach(card => grid.appendChild(card));
+    }
+
+    function filterPlants(type) {
+        const cards = document.querySelectorAll('.plant-card');
+        cards.forEach(card => {
+            if (type === '' || card.dataset.type === type) {
+                card.style.display = 'block';
+            } else {
+                card.style.display = 'none';
+            }
+        });
+    }   
+</script>
