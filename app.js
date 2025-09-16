@@ -18,17 +18,43 @@ app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Routes
+// Routes for rendering pages
+app.get('/', async (req, res) => {
+    try {
+        const AddPlant = require('./server/models/addPlantModel');
+        const plants = await AddPlant.find({}).sort({ createdAt: -1 });
+        res.render('index', { plants, title: 'Plant Collection' });
+    } catch (error) {
+        console.error('Error fetching plants:', error);
+        res.render('index', { plants: [], title: 'Plant Collection' });
+    }
+});
+
+// Route to render the form for adding a new plant
+app.get('/plants/new', (req, res) => {
+    res.render('newPlant', { title: 'Add New Plant' });
+});
+
+// Route to render details of a specific plant
+app.get('/plants/:id', async (req, res) => {
+    try {
+        const AddPlant = require('./server/models/addPlantModel');
+        const plant = await AddPlant.findById(req.params.id);
+        if (!plant) {
+            return res.status(404).render('error', { message: 'Plant not found' });
+        }
+        res.render('plantDetails', { plant, title: plant.plantName });
+    } catch (error) {
+        res.status(500).render('error', { message: 'Error loading plant details' });
+    }
+});
+
+// API Routes
 const addPlantRouter = require('./server/routes/addPlantRouter');
 const chatRouter = require('./server/routes/chatRouter');
 
 app.use('/api', addPlantRouter);
 app.use('/api', chatRouter);
-
-// Root route
-app.get("/", (req, res) => {
-    res.render("index", { title: "Home" });
-});
 
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
