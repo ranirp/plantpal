@@ -1,0 +1,33 @@
+/* Custom styles for Plant Sharing Community */
+
+body {
+    padding-top: 76px;
+    background-color: #f8f9fa;
+}
+
+.plant-card {
+    transition: transform 0.2s ease-in-out;
+    cursor: pointer;
+}
+
+.plant-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.navbar-brand {
+    font-weight: bold;
+    color: #198754 !important;
+}
+
+.plant-type-badge {
+    font-size: 0.75rem;
+    padding: 0.25em 0.5em;
+}
+
+.hero-section {
+    background: linear-gradient(135deg, #198754, #20c997);
+    color: white;
+    padding: 2rem 0;
+    margin-bottom: 2rem;
+}
