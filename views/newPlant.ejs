@@ -5,45 +5,72 @@ and modals for loading and success feedback.
 */ %>
 
 <!--Plant Form-->
-<div class="container mt-4">
+<div class="container mt-5 py-4">
     <div class="row justify-content-center">
-        <div class="col-lg-8 col-md-10">
-            <div class="card shadow">
-                <div class="card-header bg-success text-white">
-                    <h2 class="mb-0"><i class="bi bi-plus-circle me-2"></i>Add New Plant</h2>
+        <div class="col-lg-6 col-md-8">
+            <!--Form Header-->
+            <div class="text-center mb-4">
+                <div class="mb-3">
+                    <i class="bi bi-plus-circle-fill text-success" style="font-size: 3rem;"></i>
                 </div>
-                <div class="card-body">
-                    <form id="plantForm" enctype="multipart/form-data">
+                <h2 class="fw-bold text-success">Share Your Plant</h2>
+                <p class="text-muted">Tell the community about your beautiful plant</p>
+            </div>
+
+            <!--Form Card-->
+            <div class="card shadow-sm border-0">
+                <div class="card-body p-4">
+                    <form id="plantForm" method="post" action="/api/plants"  enctype="multipart/form-data">
                         <!-- Plant Name -->
-                        <div class="mb-3">
-                            <label for="plantName" class="form-label">
-                                <i class="bi bi-flower1 me-1"></i>Plant Name *
+                        <div class="mb-4">
+                            <label for="plantName" class="form-label fw-bold">
+                                <i class="bi bi-flower1 me-1 text-success"></i>Plant Name 
+                                <span class="text-danger">*</span>
                             </label>
                             <input type="text" 
-                                    class="form-control" 
+                                    class="form-control form-control-lg"  
                                     id="plantName" 
                                     name="plantName" 
+                                    placeholder="e.g., Monstera Deliciosa"
                                     required
-                                    placeholder="Enter the plant's scientific or common name">
+                                    maxlength="100">
                             <div class="invalid-feedback">
-                                Please provide a plant name.
+                                Please enter a plant name.
                             </div>
                         </div>
 
                         <!-- Plant Type -->
-                        <div class="mb-3">
-                            <label for="type" class="form-label">
-                                <i class="bi bi-tags me-1"></i>Plant Type *
+                        <div class="mb-4">
+                            <label for="type" class="form-label fw-bold">
+                                <i class="bi bi-tags me-1 text-success"></i>Plant Type
+                                <span class="text-danger">*</span>
                             </label>
-                            <select class="form-select" id="type" name="type" required>
-                                <option value="">Choose a plant type...</option>
-                                <option value="succulent">Succulent</option>
-                                <option value="fern">Fern</option>
-                                <option value="flowering">Flowering Plant</option>
-                                <option value="houseplant">Houseplant</option>
-                                <option value="herb">Herb</option>
-                                <option value="vegetable">Vegetable</option>
-                                <option value="other">Other</option>
+                            <select class="form-select form-select-lg"  
+                                    id="type" 
+                                    name="type" 
+                                    required>
+                                    <option value="" selected disabled>Choose a plant type...</option>
+                                    <option value="succulent">
+                                        <i class="bi bi-flower3"></i>Succulent
+                                    </option>
+                                    <option value="fern">
+                                        <i class="bi bi-leaf"></i>Fern
+                                    </option>
+                                    <option value="flowering">
+                                        <i class="bi bi-basket-fill"></i>Flowering Plant
+                                    </option>
+                                    <option value="houseplant">
+                                        <i class="bi bi-house-fill"></i>Houseplant
+                                    </option>
+                                    <option value="herb">
+                                        <i class="bi bi-plant"></i>Herb
+                                    </option>
+                                    <option value="vegetable">
+                                        <i class="bi bi-carrot"></i>Vegetable
+                                    </option>
+                                    <option value="other">
+                                        <i class="bi bi-question-circle"></i>Other
+                                    </option>
                             </select>
                             <div class="invalid-feedback">
                                 Please select a plant type.
@@ -51,25 +78,32 @@ and modals for loading and success feedback.
                         </div>
 
                         <!-- Description -->
-                        <div class="mb-3">
-                            <label for="description" class="form-label">
-                                <i class="bi bi-card-text me-1"></i>Description *
+                        <div class="mb-4">
+                            <label for="description" class="form-label fw-bold">
+                                <i class="bi bi-card-text me-1 text-success"></i>Description 
+                                <span class="text-danger">*</span>
                             </label>
-                            <textarea class="form-control" 
-                                        id="description" 
-                                        name="description" 
-                                        rows="4" 
-                                        required
-                                        placeholder="Describe your plant, its care requirements, growing conditions, etc."></textarea>
+                            <textarea 
+                                class="form-control" 
+                                id="description" 
+                                name="description" 
+                                rows="4" 
+                                placeholder="Describe your plant, its care requirements, growing conditions, or why you love it..."
+                                required
+                                maxlength="500"></textarea>
+                            <div class="form-text">
+                                <span id="charCount">0</span>/500 characters
+                            </div>
                             <div class="invalid-feedback">
                                 Please provide a description.
                             </div>
                         </div>
 
                         <!-- Photo Upload -->
-                        <div class="mb-3">
-                            <label for="photoID" class="form-label">
-                                <i class="bi bi-camera me-1"></i>Plant Photo
+                        <div class="mb-4">
+                            <label for="photoID" class="form-label fw-bold">
+                                <i class="bi bi-camera me-1 text-success"></i>Plant Photo
+                                <span class="text-muted">(optional)</span>
                             </label>
                             <input type="file" 
                                     class="form-control" 
@@ -77,87 +111,79 @@ and modals for loading and success feedback.
                                     name="photo" 
                                     accept="image/*">
                             <div class="form-text">
-                                Upload a photo of your plant (JPEG, PNG, WebP supported)
+                                Upload a photo of your plant (Accepted formats: JPG, JPEG, PNG, GIF; Max size: 5MB).
                             </div>
                             <div class="invalid-feedback">
                                 Please upload a valid image file.
                             </div>
-                        </div>
 
-                        <!-- Image Preview -->
-                        <div class="mb-3" id="imagePreviewContainer" style="display: none;">
-                            <label class="form-label">
-                                <i class="bi bi-eye me-1"></i>Preview
-                            </label>
-                            <div class="border rounded p-3 text-center">
-                                <img id="imagePreview" src="" alt="Image preview" class="img-fluid rounded" style="max-height: 300px;">
+                            <!-- Image Preview -->
+                            <div class="mb-3 d-none" id="imagePreviewContainer">
+                                <label class="form-label fw-bold">Preview:</label>
+                                <div class="position-relative">
+                                    <img
+                                        id="imagePreview"
+                                        src=""
+                                        alt="Preview"
+                                        class="img-fluid rounded border"
+                                        style="max-height: 300px; width: 100%; object-fit: cover;">
+                                    <button 
+                                        type="button"
+                                        class="btn btn-sm btn-danger position-absolute top-0 end-0 m-2"
+                                        onclick="clearImage()">
+                                        <i class="bi bi-x-lg"></i>
+                                    </button>
+                                </div>
                             </div>
                         </div>
-
+        
                         <!-- Nickname -->
                         <div class="mb-4">
-                            <label for="nickname" class="form-label">
-                                <i class="bi bi-heart me-1"></i>Nickname *
+                            <label for="nickname" class="form-label fw-bold">
+                                <i class="bi bi-heart me-1"></i>Your Nickname 
+                                <span class="text-danger">*</span>
                             </label>
                             <input type="text" 
                                     class="form-control" 
                                     id="nickname" 
                                     name="nickname" 
                                     required
-                                    placeholder="Give your plant a fun nickname">
+                                    placeholder="Give your plant a fun nickname e.g., Plantlove21"
+                                    maxlength="50">
                             <div class="form-text">
-                                What do you call your plant? This makes it more personal!
+                                How should we refer to you in the community?
                             </div>
                             <div class="invalid-feedback">
-                                Please provide a nickname for your plant.
+                                Please enter the nickname.
                             </div>
                         </div>
 
                         <!-- Submit Button -->
-                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
-                            <a href="/" class="btn btn-secondary me-md-2">
-                                <i class="bi bi-arrow-left me-1"></i>Cancel
-                            </a>
-                            <button type="submit" class="btn btn-success" id="submitBtn">
-                                <i class="bi bi-plus-circle me-1"></i>Add Plant
+                        <div class="d-grid gap-2">
+                            <button
+                                type="submit"
+                                class="btn btn-success btn-lg"
+                                id="submitBtn">
+                                <i class="bi bi-check-circle me-2"></i>Share Plant
                             </button>
+                            <a href="/" class="btn btn-outline-secondary">
+                                <i class="bi bi-x-circle me-2"></i>Cancel
+                            </a>
                         </div>
                     </form>
                 </div>
             </div>
-        </div>
-    </div>
-</div>
 
-<!-- Loading Modal -->
-<div class="modal fade" id="loadingModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-body text-center py-4">
-                <div class="spinner-border text-success me-3" role="status">
-                    <span class="visually-hidden">Loading...</span>
-                </div>
-                Adding your plant...
-            </div>
-        </div>
-    </div>
-</div>
-
-<!-- Success Modal -->
-<div class="modal fade" id="successModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-body text-center py-4">
-                <i class="bi bi-check-circle text-success" style="font-size: 3rem;"></i>
-                <h4 class="mt-3 mb-2">Plant Added Successfully!</h4>
-                <p class="mb-3">Your plant has been added to the community.</p>
-                <div class="d-grid gap-2 d-md-flex justify-content-md-center">
-                    <a href="/" class="btn btn-success me-md-2">View Collection</a>
-                    <button type="button" class="btn btn-outline-success" onclick="window.location.reload()">Add Another</button>
-                </div>
+            <!--Help Text-->
+            <div class="text-center mb-4">
+                <small class="text-muted">
+                    <i class="bi bi-info-circle me-1"></i>
+                    All fields marked with <span class="text-danger">*</span> are required
+                </small>
             </div>
         </div>
     </div>
 </div>
 
 <script src="/javascripts/addPlant/addPlantScript.js"></script>
+<link rel="stylesheet" href="/css/styles.css">
