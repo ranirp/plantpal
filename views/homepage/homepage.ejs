@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="cupcake">
+<head>
+    <title>Plant Sharing Community</title>
+</head>
+<body onload="init()">
+    <!--Main container with layout spanning the full viewport height-->
+    <div class="flex flex-col h-screen">
+
+        <!--Filter and sort controls-->
+        <div class="bg-white shadow-md p-4 mt-20 flex flex-col sm:flex-row gap-4 items-center justify-between">
+            <!--Filter by type-->
+            <div class="flex items-center gap-2">
+                <label for="typeFilter" class="font-bold">Filter by Type:</label>
+                <select id="typeFilter" class="select select-bordered" onchange="filterByType()">
+                    <option value="all">All Types</option>
+                    <option value="succulent">Succulent</option>
+                    <option value="flowering">Flowering</option>
+                    <option value="foliage">Fern</option>
+                    <option value="cactus">Houseplant</option>
+                    <option value="bamboo">Vegetable</option>
+                    <option value="herb">Herb</option>
+                    <option value="other">Other</option>
+                </select>
+            </div>
+
+            <!--Sort Controls-->
+            <div class="flex items-center gap-2">
+                <label for="sortOptions" class="font-bold">Sort by:</label>
+                <div class="btn-group">
+                    <button class="btn btn-sm" onclick="sortPlants('date')">Date</button>
+                    <button class="btn btn-sm" onclick="sortPlants('type')">Type</button>
+                    <button class="btn btn-sm" onclick="sortPlants('name')">plantName</button>
+                </div>
+            </div>
+        </div>
+
+        <!--Grid layout for displaying the list of plants-->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4" id="plantList">
+            <!--Plant cards will be dynamically inserted here-->
+        </div>
+
+        <!--Fixed position container for action buttons-->
+        <div class="fixed bottom-10 right-10">
+            <!--Button to open the add plant modal-->
+            <button
+                class="btn btn-neutral shadow-2xl btn-lg text-4xl text-white"
+                onclick="openAddPlantModal()"
+            >
+                +
+                <div class="text-lg">Add Plant</div>
+            </button>
+        </div>
+
+        <!--Include the header component-->
+        <%- include('../components/header.ejs') %>
+    </div>
+    <!--Include the online/offline mode component-->
+    <%- include('../components/onlineOfflineMode.ejs') %>
+</body>
+</html>
