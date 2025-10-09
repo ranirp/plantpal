@@ -24,7 +24,7 @@ const addPlantRouter = require('./server/routes/addPlantRouter');
 
 //Routes
 app.use('/', homeRouter);
-app.use('/api', addPlantRouter);
+app.use('/addPlant', addPlantRouter);
 
 // API Routes
 app.use('/api/plants', require('./server/routes/addPlantRouter'));
