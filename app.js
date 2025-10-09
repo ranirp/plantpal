@@ -19,7 +19,7 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Import routers
-const homeRouter = require('./server/routes/homeRouter');
+const homeRouter = require('./server/routes/homepageRouter');
 const addPlantRouter = require('./server/routes/addPlantRouter');
 
 //Routes
