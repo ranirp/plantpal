@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+        <link rel="stylesheet" href="/css/outputStyles.css" />
+        <script src="/javascripts/chat/chatScript.js"></script>
+        <script src="/javascripts/chat/chatRenderScript.js"></script>
+        <script src="/javascripts/chat/chatIDBScript.js"></script>
+        <script src="/javascripts/user/userRenderScript.js"></script>
+        <script>
+            plantID = '<%= data._id %>';
+        </script>
+    </head>
+
+    <script src="/tw-elements/dist/js/tw-elements.umd.min.js" type="text/javascript"></script>
+
+    <body onload="init()">
+
+        <div class="flex flex-col h-full card w-full glass">
+            <div class="p-4 border-b-2 flex flex-row justify-between">
+                Chat on : <%= data.plantName %> 
+                <div class="flex flex-row items-center">
+                    <div class="rounded-full w-4 h-4 shadow-xl" id="onlineColor"></div>
+                    <div id="onlineText" class="pl-2"></div>
+                </div>
+            </div>
+            <div class="flex flex-col lg:h-full h-[300px] mx-2 overflow-scroll py-9" id="chatMessages"></div>
+            <%- include('./chatInputComponent.ejs') %>
+        </div>
+    </body>
+</html>
