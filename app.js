@@ -28,7 +28,7 @@ app.use('/', homepageRouter);
 app.use('/addPlant', addPlantRouter);
 app.use('/plantDetails', plantDetailsRouter);
 
-// API Routes
+// API Routes 
 app.use('/api/plants', require('./server/routes/addPlantRouter'));
 
 // Start the server
