@@ -19,12 +19,12 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 // Import routers
-const homeRouter = require('./server/routes/homepageRouter');
+const homepageRouter = require('./server/routes/homepageRouter');
 const addPlantRouter = require('./server/routes/addPlantRouter');
 const plantDetailsRouter = require('./server/routes/plantDetailsRouter');
 
 //Routes
-app.use('/', homeRouter);
+app.use('/', homepageRouter);
 app.use('/addPlant', addPlantRouter);
 app.use('/plantDetails', plantDetailsRouter);
 
