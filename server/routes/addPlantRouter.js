@@ -6,15 +6,12 @@
 
 var express = require('express');
 const {
-    renderAddPlantPage,
+    addPlantPage,
     addNewPlantToDB,
     getAllPlants,
     getPlantById,
     getPlantsByType,
 } = require('../controllers/addPlantController');
-
-// alias controller export to the expected name
-const addPlantPage = renderAddPlantPage;
 const upload = require('../middleware/multer.config.js');
 
 var router = express.Router();

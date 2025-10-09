@@ -8,7 +8,7 @@ const AddPlant = require('../models/addPlantModel');
 /**
  * Renders the add plant page
  */
-exports.renderAddPlantPage = (req, res, next) => {
+exports.addPlantPage = (req, res, next) => {
     res.render("addPlant/addPlant", { 
         title: "Share your Plant",
     });
