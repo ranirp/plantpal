@@ -5,31 +5,200 @@
 
 const AddPlant = require('../models/addPlantModel');
 
-exports.addNewPlantToDB = async (req, res, next) => {
-    const { plantName, type, description, nickname } = req.body;
-    let photoPath = req.file ? req.file.filename : null;
-
-    const newPlant = new AddPlant({
-        plantName,
-        type,
-        description,
-        photo: photoPath,
-        nickname
+/**
+ * Renders the add plant page
+ */
+exports.renderAddPlantPage = (req, res, next) => {
+    res.render("addPlant/addPlant", { 
+        title: "Share your Plant",
     });
-
-    return newPlant.save()
-        .then((plant) => {
-            console.log('Plant added successfully:', plant);
-            res.json(plant);
-        })
-        .catch((error) => {
-            console.error('Error adding plant:', error);
-            res.status(500).json({ 
-                success: false, 
-                message: 'Error adding plant', 
-                error: error.message
-            });
-        });
 };
 
+/**
+ * Adds a new plant to the database
+ * Required fields: plantName, type, description, nickname
+ * Optional field: photo (filename of the uploaded image)
+ */
+exports.addNewPlantToDB = async (req, res, next) => {
+    try {
+        const { plantName, type, description, nickname } = req.body;
+        
+        // Validate required fields
+        if (!plantName || !type || !description || !nickname) {
+            return res.status(400).json({
+                success: false,
+                message: "Missing required fields",
+                requiredFields: ['plantName', 'type', 'description', 'nickname'],
+            });
+        }
 
+        // Validate plant type
+        const validTypes = [
+            'succulent', 
+            'fern', 
+            'houseplant', 
+            'vegetable', 
+            'flowering', 
+            'herb', 
+            'other'
+        ];
+        if (!validTypes.includes(type.toLowerCase())) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid plant type'
+            });
+        }
+
+        let photoPath = null;
+        if (req.file && req.file.filename) {
+            photoPath = req.file.filename; // Assuming multer middleware is used for file upload
+        }
+
+        // Create a new plant instance
+        const newPlant = new AddPlant({
+            plantName,
+            type,
+            description,
+            nickname,
+            photo: photoPath
+        });
+
+        console.log('Adding new plant:', newPlant);
+
+        // Save the new plant to the database
+        const savedPlant = await newPlant.save();
+        console.log('Plant added successfully:', savedPlant);
+
+        res.status(201).json({
+            success: true,
+            message: "Plant added successfully",
+            plant: savedPlant
+        });
+    } catch (err) {
+        console.error('Error adding new plant:', err);
+        res.status(500).json({
+            success: false,
+            message: "Error adding new plant",
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get all plants with optional sorting
+ * Supports: sortBy (type, createdAt, plantName), order (asc, desc)
+ */
+exports.getAllPlants = async (req, res, next) => {
+    try {
+        const { sortBy = 'createdAt', order = 'desc' } = req.query;
+
+        let sortOptions = {};
+
+        switch (sortBy) {
+            case 'type':
+                sortOptions.type = order === 'desc' ? -1 : 1;
+                break;
+            case 'plantName':
+                sortOptions.plantName = order === 'desc' ? -1 : 1;
+                break;
+            case 'createdAt':
+            default:
+                sortOptions.createdAt = order === 'desc' ? -1 : 1;
+                break;
+        }
+
+        const plants = await AddPlant.find({}).sort(sortOptions);
+
+        console.log(`Plants retrieved successfully! Count: ${plants.length}`);
+
+        res.json({ 
+            success: true, 
+            count: plants.length, 
+            plants 
+        });
+    } catch (err) {
+        console.error('Error retrieving plants:', err);
+        res.status(500).json({
+            success: false,
+            message: "Error retrieving plants",
+            error: err.message
+        });
+    }
+}
+
+
+/**
+ * Get a specific plant by its ID
+ */
+exports.getPlantById = async (req, res, next) => {
+    try {
+        const plant = await AddPlant.findById(req.params.id);
+
+        if (!plant) {
+            return res.status(404).json({
+                success: false,
+                message: "Plant not found"
+            });
+        }
+
+        console.log('Plant retrieved successfully:', plant);
+
+        res.json({ 
+            success: true, 
+            plant 
+        });
+    } catch (err) {
+        console.error('Error retrieving plant:', err);
+        res.status(500).json({
+            success: false,
+            message: "Error retrieving plant",
+            error: err.message
+        });
+    }
+};
+
+/**
+ * Get plants filtered by type
+ */
+exports.getPlantsByType = async (req, res, next) => {
+    try {
+        const { type } = req.params;
+
+        // Validate plant type
+        const validTypes = [
+            'succulent', 
+            'fern', 
+            'houseplant', 
+            'vegetable', 
+            'flowering', 
+            'herb', 
+            'other'
+        ];
+
+        if (!validTypes.includes(type)) {
+            return res.status(400).json({
+                success: false,
+                message: 'Invalid plant type',
+                validTypes
+            });
+        }
+
+        const plants = await AddPlant.find({ type }).sort({ createdAt: -1 });
+
+        console.log(`Plants of type ${type} retrieved successfully! Count: ${plants.length}`);
+
+        res.json({ 
+            success: true, 
+            count: plants.length, 
+            plants 
+        });
+    } catch (err) {
+        console.error('Error retrieving plants by type:', err);
+        res.status(500).json({
+            success: false,
+            message: "Error retrieving plants by type",
+            error: err.message
+        });
+    }
+}
+        

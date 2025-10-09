@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html data-theme="cupcake">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>Share Your Plant</title>
+        <link rel="stylesheet" href="/stylesheets/output.css" />
+        <link 
+            rel="stylesheet" 
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" 
+        />
+        <script src="/javascripts/addPlant/addPlantScript.js"></script>
+        <script src="/javascripts/addPlant/addPlantUtility.js"></script>
+    </head>
+    <body onload="init()" class="h-screen flex items-center place-content-center relative">
+        <img src="/images/addplant.jpg" class="absolute top-8 left-8 w-[400px] hidden md:block z-2" />
+        
+        <div class="absolute flex flex-col place-content-center items-center bg-white shadow-md p-6 w-full md:w-2/3 lg:w-1/2">
+            <h1 class="text-3xl font-bold mb-4 text-center">Share Your Plant</h1>
+            <form method="POST" enctype="multipart/form-data" id="addPlantForm">
+
+                <!-- Plant Name -->
+                <div class="mb-4">
+                    <label for="plantName" class="block font-bold">Plant Name:</label>
+                    <input 
+                        type="text" 
+                        id="plantName" 
+                        name="plantName" 
+                        class="input input-bordered w-full rounded-sm" 
+                        required 
+                        placeholder="Enter plant name"
+                    />
+                </div>
+
+                <!-- Plant Type -->
+                <div class="mb-4">
+                    <label for="type" class="block font-bold">Plant Type:</label>
+                    <select 
+                        id="type" 
+                        name="type" 
+                        class="select select-bordered w-full rounded-sm" 
+                        required
+                    >
+                        <option value="" disabled selected>Select a plant type</option>
+                        <option value="succulent">Succulent</option>
+                        <option value="foliage">Fern</option>
+                        <option value="cactus">Houseplant</option>
+                        <option value="bamboo">Vegetable</option>
+                        <option value="flowering">Flowering</option>
+                        <option value="herb">Herb</option>
+                        <option value="other">Other</option> 
+                    </select>
+                </div>
+
+                <!-- Plant Description -->
+                <div class="mb-4">
+                    <label for="description" class="block font-bold">Description:</label>
+                    <textarea 
+                        id="description" 
+                        name="description" 
+                        class="input input-bordered w-full rounded-sm h-30" 
+                        rows="4" 
+                        required
+                        placeholder="Share care tips, growing conditions, or other details about your plant"
+                    ></textarea>
+                </div>
+
+                <!-- Plant Photo Upload -->
+                <div class="mb-4">
+                    <label for="photo" class="block font-bold">Upload Photo:</label>
+                    <input 
+                        type="file" 
+                        id="photoID" 
+                        name="photo" 
+                        accept="image/*" 
+                        class="file-input file-input-bordered w-full max-w-xs rounded-sm"
+                        required
+                    />
+                    <div id="imagePreview" class="mt-2 hidden">
+                        <img id="previewImg" alt="Image Preview" class="max-w-xs rounded-md border" />
+                    </div>
+                </div>
+
+                <!-- User Nickname -->
+                <div class="mb-4">
+                    <label for="nickname" class="block font-bold">Your Nickname:</label>
+                    <input 
+                        type="text" 
+                        id="nickname" 
+                        name="nickname" 
+                        class="input input-bordered w-full rounded-sm" 
+                        required 
+                        placeholder="Enter your nickname"
+                    />
+                </div>
+
+                <!-- Submit Button -->
+                <div class="mb-4 flex justify-center w-full">
+                    <button type="submit" class="btn btn-neutral w-full rounded-sm">
+                        Share Plant
+                    </button>
+                </div>
+            </form>
+        </div>
+    </body>
+
+    <!-- Online/Offline Status -->
+    <%- include('../components/onlineOfflineMode.ejs') %>
+</html>
