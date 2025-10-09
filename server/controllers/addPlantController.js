@@ -51,7 +51,12 @@ exports.addNewPlantToDB = async (req, res, next) => {
 
         let photoPath = null;
         if (req.file && req.file.filename) {
-            photoPath = req.file.filename; // Assuming multer middleware is used for file upload
+            photoPath = req.file.filename; // Multer sets the filename property on successful upload
+            console.log('File uploaded successfully:', req.file);
+        } else {
+            console.log('No file was uploaded or file upload failed');
+            // Use a default image if needed
+            // photoPath = 'default-plant.jpg';
         }
 
         // Create a new plant instance
@@ -76,6 +81,19 @@ exports.addNewPlantToDB = async (req, res, next) => {
         });
     } catch (err) {
         console.error('Error adding new plant:', err);
+        
+        // Handle validation errors specifically
+        if (err.name === 'ValidationError') {
+            const validationErrors = Object.values(err.errors).map(e => e.message);
+            return res.status(400).json({
+                success: false,
+                message: validationErrors.join('. '),
+                error: err.message,
+                validationErrors: validationErrors
+            });
+        }
+        
+        // Handle other errors
         res.status(500).json({
             success: false,
             message: "Error adding new plant",

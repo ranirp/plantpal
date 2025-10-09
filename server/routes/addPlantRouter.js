@@ -5,6 +5,7 @@
  */
 
 var express = require('express');
+const multer = require('multer');
 const {
     addPlantPage,
     addNewPlantToDB,
@@ -27,7 +28,21 @@ router.get('/', addPlantPage);
  * Add a new plant to the database 
  * Accepts multipart form data with optional photo 
  */
-router.post('/addNewPlant', upload.single('photo'), addNewPlantToDB);
+router.post('/addNewPlant', (req, res, next) => {
+    upload.single('photo')(req, res, (err) => {
+        if (err) {
+            console.error('File upload error:', err);
+            return res.status(400).json({
+                success: false,
+                message: err instanceof multer.MulterError 
+                    ? `Upload error: ${err.message}` 
+                    : `File error: ${err.message}`
+            });
+        }
+        // If no error, proceed to controller
+        next();
+    });
+}, addNewPlantToDB);
 
 /** 
  * API Endpoints (for plant retrieval)

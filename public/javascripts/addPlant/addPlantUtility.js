@@ -57,18 +57,23 @@ const getAllSyncPlants = (plantDB) => {
  * Function to delete a synced plant from IndexedDB.
  * @param {IDBDatabase} plantDB - IndexedDB instance for synced plants.
  * @param {number} id - ID of the plant to be deleted.
+ * @returns {Promise} - Promise resolving when the plant is deleted.
 */
 const deleteSyncPlantFromIDB = (plantDB, id) => {
-    const transaction = plantDB.transaction([SYNC_PLANT_STORE_NAME], 'readwrite');
-    const plantStore = transaction.objectStore(SYNC_PLANT_STORE_NAME);
-    const deleteRequest = plantStore.delete(id);
+    return new Promise((resolve, reject) => {
+        const transaction = plantDB.transaction([SYNC_PLANT_STORE_NAME], 'readwrite');
+        const plantStore = transaction.objectStore(SYNC_PLANT_STORE_NAME);
+        const deleteRequest = plantStore.delete(id);
 
-    deleteRequest.addEventListener('success', () => {
-        console.log(`Deleted plant with ID ${id} from IndexedDB.`);
-    });
+        deleteRequest.addEventListener('success', () => {
+            console.log(`Deleted plant with ID ${id} from IndexedDB.`);
+            resolve();
+        });
 
-    deleteRequest.addEventListener('error', (event) => {
-        console.error('Error deleting plant from IndexedDB:', event.target.error);
+        deleteRequest.addEventListener('error', (event) => {
+            console.error('Error deleting plant from IndexedDB:', event.target.error);
+            reject(event.target.error);
+        });
     });
 };
 
@@ -103,14 +108,45 @@ const openSyncPlantIDB = () => {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(SYNC_PLANT_STORE_NAME, 1);
 
-        request.onerror = function(event) {
+        request.onsuccess = function(event) {
             const db = event.target.result;
             resolve(db);
         };
 
+        request.onerror = function(event) {
+            console.error('IndexedDB error:', event.target.error);
+            reject(event.target.error);
+        };
+
         request.onupgradeneeded = function(event) {
             const db = event.target.result;
-            db.createObjectStore(SYNC_PLANT_STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            if (!db.objectStoreNames.contains(SYNC_PLANT_STORE_NAME)) {
+                db.createObjectStore(SYNC_PLANT_STORE_NAME, { keyPath: 'id', autoIncrement: true });
+            }
         };
+    });
+};
+
+/**
+ * Function to get all plants from IndexedDB (wrapper for getAllSyncPlants)
+ * @returns {Promise} - Promise resolving to an array of plant objects.
+ */
+const getAllPlantsFromIDB = () => {
+    return new Promise(async (resolve, reject) => {
+        try {
+            const db = await openSyncPlantIDB();
+            const syncPlants = await getAllSyncPlants(db);
+            const plants = syncPlants.map(item => {
+                const plant = item.value || item;
+                // Remove internal flags when returning plants for display
+                const cleanPlant = { ...plant };
+                delete cleanPlant.__isServerPlant;
+                return cleanPlant;
+            });
+            resolve(plants);
+        } catch (error) {
+            console.error('Error getting plants from IndexedDB:', error);
+            resolve([]); // Return empty array on error
+        }
     });
 };
