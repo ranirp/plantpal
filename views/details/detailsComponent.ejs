@@ -1,0 +1,67 @@
+<div class="card w-full glass h-full">
+    <div class="stats shadow h-full relative">
+        <div
+            class="absolute top-2 left-2 btn btn-circle btn-neutral"
+            onclick="window.history.back();"
+        >
+        <svg xmlns="http://www.w3.org/2000/svg" class="w-5 text-white" viewBox="0 0 320 512">
+            <path class="fill-white" d="M41.4 233.4c-12.5 12.5-12.5 32.8 0 45.3l160 160c12.5 12.5 32.8 12.5 45.3 0s12.5-32.8 0-45.3L109.3 256 246.6 118.6c12.5-12.5 12.5-32.8 0-45.3s-32.8-12.5-45.3 0l-160 160z"/>
+        </svg>
+    </div>
+
+    <figure>
+        <img 
+            src="/images/uploads/<%= data.photo %>" 
+            alt="<%= data.plantName %>" 
+            class="p-4 object-cover max-h-96"
+            onerror="this.onerror=null;this.src='/images/placeholder.jpg';" 
+        />
+    </figure>
+    </div>
+
+    <div class="card-body p-5 m-0 h-full">
+        <h2 class="card-title text-2xl"><%= data.plantName %></h2>
+
+        <div class="card overscroll-none">
+            <div class="overscroll-none flex flex-row flex-nowrap">
+                <div class="mr-2 font-bold">Created by:</div>
+                <%= data.nickname %>
+            </div>
+        </div>
+
+        <div class="card overscroll-none">
+            <div class="overscroll-none flex flex-row flex-nowrap">
+                <div class="mr-2 font-bold">Type:</div>
+                <div class="badge badge-primary capitalize"><%= data.type %></div>
+            </div>
+        </div>
+
+        <div class="card overscroll-none">
+            <div class="overscroll-none flex flex-row flex-nowrap">
+                <div class="mr-2 font-bold">Added:</div>
+                <%= new Date(data.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit'
+                }) %>
+            </div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="card overscroll-none">
+            <div class="font-bold mb-2">Description:</div>
+            <div class="bg-base-100 p-3 rounded-lg">
+                <%= data.description %>
+            </div>
+        </div>
+
+        <div class="card-actions justify-end mt-4">
+            <div class="text-sm text-gray-500">
+                Plant ID: <%= data._id %>
+            </div>
+        </div>
+    </div>
+</div>
