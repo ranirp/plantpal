@@ -21,10 +21,12 @@ app.use(express.urlencoded({ extended: true }));
 // Import routers
 const homeRouter = require('./server/routes/homepageRouter');
 const addPlantRouter = require('./server/routes/addPlantRouter');
+const plantDetailsRouter = require('./server/routes/plantDetailsRouter');
 
 //Routes
 app.use('/', homeRouter);
 app.use('/addPlant', addPlantRouter);
+app.use('/plantDetails', plantDetailsRouter);
 
 // API Routes
 app.use('/api/plants', require('./server/routes/addPlantRouter'));
