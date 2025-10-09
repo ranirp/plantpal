@@ -47,6 +47,9 @@ build/Release
 _notes
 dwsync.xml
 
+# User uploaded files
+public/images/uploads/*
+
 # SASS
 .sass-cache
 
