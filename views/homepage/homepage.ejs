@@ -2,22 +2,32 @@
 <html lang="en" data-theme="cupcake">
 <head>
     <title>Plant Sharing Community</title>
+    <link rel="stylesheet" href="/css/outputStyles.css" />
+    <script src="/javascripts/user/userIDBScript.js"></script>
+    <script src="/javascripts/user/userScript.js"></script>
+    <script src="/javascripts/user/userRenderScript.js"></script>
+    <script src="/javascripts/addPlant/addPlantUtility.js"></script>
+    <script src="/javascripts/home/homeScript.js"></script>
+    <script src="/javascripts/home/homeRenderScript.js"></script>
 </head>
 <body onload="init()">
+    <!--Include the header component at the top-->
+    <%- include('../components/header.ejs') %>
+    
     <!--Main container with layout spanning the full viewport height-->
-    <div class="flex flex-col h-screen">
+    <div class="flex flex-col min-h-screen pt-20">
 
         <!--Filter and sort controls-->
-        <div class="bg-white shadow-md p-4 mt-20 flex flex-col sm:flex-row gap-4 items-center justify-between">
+        <div class="bg-white shadow-md p-4 flex flex-col lg:flex-row gap-4 items-center justify-between">
             <!--Filter by type-->
-            <div class="flex items-center gap-2">
-                <label for="typeFilter" class="font-bold">Filter by Type:</label>
-                <select id="typeFilter" class="select select-bordered" onchange="filterByType()">
+            <div class="flex items-center gap-2 w-full lg:w-auto">
+                <label for="typeFilter" class="font-bold text-gray-700 text-sm lg:text-base whitespace-nowrap">Filter:</label>
+                <select id="typeFilter" class="select select-bordered w-full max-w-xs text-sm lg:text-base" onchange="filterByType()">
                     <option value="all">All Types</option>
                     <option value="succulent">Succulent</option>
-                    <option value="foliage">Fern</option>
-                    <option value="cactus">Houseplant</option>
-                    <option value="bamboo">Vegetable</option>
+                    <option value="fern">Fern</option>
+                    <option value="houseplant">Houseplant</option>
+                    <option value="vegetable">Vegetable</option>
                     <option value="flowering">Flowering</option>
                     <option value="herb">Herb</option>
                     <option value="other">Other</option>
@@ -25,35 +35,34 @@
             </div>
 
             <!--Sort Controls-->
-            <div class="flex items-center gap-2">
-                <label for="sortOptions" class="font-bold">Sort by:</label>
+            <div class="flex items-center gap-2 w-full lg:w-auto">
+                <label for="sortOptions" class="font-bold text-gray-700 text-sm lg:text-base whitespace-nowrap">Sort:</label>
                 <div class="btn-group">
-                    <button class="btn btn-sm" onclick="sortPlants('date')">Date</button>
-                    <button class="btn btn-sm" onclick="sortPlants('type')">Type</button>
-                    <button class="btn btn-sm" onclick="sortPlants('name')">plantName</button>
+                    <button class="btn btn-sm btn-neutral text-xs lg:text-sm" onclick="sortPlants('date')">Date</button>
+                    <button class="btn btn-sm btn-neutral text-xs lg:text-sm" onclick="sortPlants('type')">Type</button>
+                    <button class="btn btn-sm btn-neutral text-xs lg:text-sm" onclick="sortPlants('name')">Name</button>
                 </div>
+            </div>
+
+            <!--Add Plant Button-->
+            <div class="flex items-center gap-2 w-full lg:w-auto">
+                <button 
+                    class="btn btn-primary w-full lg:w-auto text-sm lg:text-base"
+                    onclick="openAddPlantPage()"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <circle cx="12" cy="12" r="10"/>
+                        <path d="M12 8v8M8 12h8"/>
+                    </svg>
+                    Add Plant
+                </button>
             </div>
         </div>
 
         <!--Grid layout for displaying the list of plants-->
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-4" id="plantList">
+        <div class="flex-1 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 p-6" id="plantList">
             <!--Plant cards will be dynamically inserted here-->
         </div>
-
-        <!--Fixed position container for action buttons-->
-        <div class="fixed bottom-10 right-10">
-            <!--Button to open the add plant modal-->
-            <button
-                class="btn btn-neutral shadow-2xl btn-lg text-4xl text-white"
-                onclick="openAddPlantModal()"
-            >
-                +
-                <div class="text-lg">Add Plant</div>
-            </button>
-        </div>
-
-        <!--Include the header component-->
-        <%- include('../components/header.ejs') %>
     </div>
     <!--Include the online/offline mode component-->
     <%- include('../components/onlineOfflineMode.ejs') %>

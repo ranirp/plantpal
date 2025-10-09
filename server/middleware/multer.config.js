@@ -9,7 +9,9 @@ const path = require('path');
 // Set up storage engine for multer
 const storage = multer.diskStorage({
     destination: function (req, file, cb) {
-        cb(null, 'public/uploads/'); // Directory to save uploaded files
+        // Use absolute path to ensure files are saved in the correct location
+        const uploadPath = path.join(__dirname, '../../public/images/uploads/');
+        cb(null, uploadPath); // Directory to save uploaded files
     },
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
@@ -17,6 +19,23 @@ const storage = multer.diskStorage({
     }
 });
 
-const upload = multer({ storage: storage });
+// File filter to validate image files
+const fileFilter = (req, file, cb) => {
+    // Accept only image files
+    if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+    } else {
+        cb(new Error('Only image files are allowed!'), false);
+    }
+};
+
+// Set upload size limits and other options
+const upload = multer({ 
+    storage: storage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB file size limit
+    }
+});
 
 module.exports = upload;
