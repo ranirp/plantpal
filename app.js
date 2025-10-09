@@ -9,6 +9,11 @@ const server = http.createServer(app);
 // Database connection
 require('./server/database/database');
 
+// Socket.io setup
+const io = require('socket.io')(server);
+const socketIOController = require('./server/controllers/socketIOController');
+socketIOController.init(io);
+
 // View engine setup
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
