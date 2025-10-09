@@ -9,12 +9,41 @@ let Schema = mongoose.Schema;
 
 // Define the Chat schema
 let ChatSchema = new Schema({
-    message: { type: String, required: true },
-    nickname: { type: String, required: true }, // user nickname
-    plantId: { type: mongoose.Schema.Types.ObjectId, ref: 'addPlants', required: true }, // reference to the plant
-    createdAt: { type: Date, default: Date.now }
+    chatMessage: {
+        type: String,
+        required: true,
+        maxlength: 500,
+        trim: true
+    },
+    username: {
+        type: String,
+        required: true,
+        trim: true
+    },
+    chatTime: {
+        type: Date,
+        default: Date.now,
+        required: true
+    },
+    plantID: {
+        type: String,
+        required: true
+    }
+}, {
+    timestamps: true
 });
 
-ChatSchema.set("toObject", { getters: true, virtuals: true });
-let ChatMessage = mongoose.model('chatMessages', ChatSchema);
-module.exports = ChatMessage;
+// Configure the toObject option for schema to include virtuals and getters
+ChatSchema.set('toObject', { virtuals: true, getters: true });
+ChatSchema.set('toJSON', { virtuals: true, getters: true });
+
+// Create index for efficient queries
+ChatSchema.index({ plantID: 1, chatTime: -1 });
+
+// Create mongoose model on defined schema
+let chatMessage = mongoose.model('ChatMessages', ChatSchema);
+
+module.exports = chatMessage;
+
+
+    
