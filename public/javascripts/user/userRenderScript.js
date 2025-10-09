@@ -26,7 +26,12 @@ function toggleLogoutButton(shouldShow) {
 function toggleWelcomeText(shouldShow) {
     const userWelcomeText = document.getElementById("welcomeUserText");
     if (userWelcomeText) {
-        userWelcomeText.innerHTML = loggedInUser;
+        const formatName = (name) => {
+            if (!name) return '';
+            const s = String(name).trim();
+            return s.charAt(0).toUpperCase() + s.slice(1).toLowerCase();
+        };
+        userWelcomeText.innerText = loggedInUser ? `${formatName(loggedInUser)}` : '';
         userWelcomeText.classList.toggle("hidden", !shouldShow);
     }
 }

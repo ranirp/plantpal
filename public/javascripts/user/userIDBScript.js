@@ -85,7 +85,8 @@ function getUserName() {
                 const request = objectStore.getAll();
                 request.onsuccess = function (event) {
                     const users = event.target.result;
-                    const userName = users[users.length - 1];
+                    // Return null if no users exist, otherwise return the last user
+                    const userName = users && users.length > 0 ? users[users.length - 1] : null;
                     console.log("User name:", userName);
                     resolve(userName);
                 };
