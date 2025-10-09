@@ -1,160 +1,154 @@
-/**
- * @fileoverview Client-side JavaScript for the Add Plant form.
- * Handles image preview, form validation, and submission to the API.
- */
+const { get } = require("mongoose");
 
-const descriptionField = document.getElementById('description');
-const charCount = document.getElementById('charCount');
+// Declare a variable to hold the logged in user information
+let loggedInUser = null;
 
-descriptionField.addEventListener('input', function() {
-    charCount.textContent = this.value.length;
-
-    // Change color as approaching limit
-    if (this.value.length > 450) {
-        charCount.classList.add('text-danger');
-    } else if (this.value.length > 400) {
-        charCount.classList.remove('text-danger');
-        charCount.classList.add('text-warning');
-    } else {
-        charCount.classList.remove('text-warning', 'text-danger');
-    }
-});
-
-// Image preview functionality
-const photoInput = document.getElementById('photo');
-const imagePreview = document.getElementById('imagePreview');
-const imagePreviewContainer = document.getElementById('imagePreviewContainer');
-
-photoInput.addEventListener('change', function(e) {
-    const file = e.target.files[0];
-
-    if (file) {
-        //Validate file size (Max 5MB)
-        if (file.size > 5 * 1024 * 1024) {
-            alert('File size must be less than 5MB');
-            photoInput.value = ''; // Clear the input
-            return;
-        }
-
-        // Validate file type
-        if (!file.type.startsWith('image/')) {
-            alert('Please select a valid image file');
-            photoInput.value = ''; // Clear the input
-            return;
-        }
-
-        // Show image preview
-        const reader = new FileReader();
-        reader.onload = function(event) {
-            imagePreview.src = event.target.result;
-            imagePreviewContainer.classList.remove('d-none');
-        };
-        reader.readAsDataURL(file);
-    }
-});
-
-// Clear image preview
-function clearImagePreview() {
-    photoInput.value = '';
-    imagePreview.src = '#';
-    imagePreviewContainer.classList.add('d-none');
+// Function to initialize the application
+function init() {
+    // Register form submission event 
+    registerFormSubmit();
+    // Get the logged in user
+    getLoggedInUser();
+    // Setup image preview functionality
+    setupImagePreview();
 }
 
-// Form submission with validation and feedback
-const form = document.getElementById('addPlantForm');
-const submitBtn = document.getElementById('submitBtn');
+// Function to get the logged in user
+function getLoggedInUser() {
+    // Asynchronously retrieve the user name
+    getUserName().then((userName) => {
+        // If user name exists, set it as the logged-in user
+        if (userName) {
+            loggedInUser = userName.value;
+            // Pre-fill the nickname field with the logged-in user's name
+            const nicknameField = document.getElementById("nickname");
+            if (nicknameField && loggedInUser) {
+                nicknameField.value = loggedInUser;
+            }
+        }
+    });
+}
 
-form.addEventListener('submit', async function(e) {
-    e.preventDefault();
+// Function to setup image preview functionality
+function setupImagePreview() {
+    const photoInput = document.getElementById("photoID");
+    if (photoInput) {
+        photoInput.addEventListener("change", function(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const previewImg = document.getElementById("previewImage");
+                    const previewDiv = document.getElementById("imagePreview");
+                    if (previewImg && previewDiv) {
+                        previewImg.src = e.target.result;
+                        previewDiv.classList.remove("hidden");
+                    }
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+}
 
-    // Basic client-side validation
-    if (!form.checkValidity()) {
-        e.stopPropagation();
-        form.classList.add('was-validated');
+// Function to register form submission event
+function registerFormSubmit() {
+    const plantForm = document.getElementById("plantForm");
+    if (plantForm) {
+        plantForm.addEventListener("submit", function(event) {
+            event.preventDefault(); // Prevent default form submission
+            // Call custom form submission handler
+            addNewPlantDetails();
+        });
+    } else {
+        console.error("Plant form not found!");
+    }
+}
+
+// Function to add new plant details
+function addNewPlantDetails() {
+    // Get values from the form fields
+    const plantName = document.getElementById("plantName").value;
+    const type = document.getElementById("type").value;
+    const description = document.getElementById("description").value;
+    const nickname = document.getElementById("nickname").value;
+    const photo = document.getElementById("photoID").files[0];
+
+    // Validate required fields
+    if (!plantName || !type || !description || !nickname) {
+        alert("Please fill in all required fields.");
         return;
     }
 
-    // Show loading state
-    submitBtn.disabled = true;
-    const originalText = submitBtn.innerHTML;
-    submitBtn.innerHTML = `<span class="spinner-border spinner-border-sm me-2"></span>Sharing...`;
-
-    try {
-        const formData = new FormData(form);
-
-        const response = await fetch('/api/plants', {
-            method: 'POST',
-            body: formData
-        });
-
-        if (response.ok) {
-            const result = await response.json();
-
-            // Show success message and redirect
-            alert('Plant shared successfully!');
-            window.location.href = '/';
-        } else {
-            const error = await response.json();
-            alert('Error: ' + (error.message || 'Failed to share plant'));
-
-            // Reset button
-            submitBtn.disabled = false;
-            submitBtn.innerHTML = originalText;
-        }
-    } catch (error) {
-        console.error('Error submitting form:', error);
-        alert('An unexpected error occurred. Please try again.');
-
-        // Reset button
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = originalText;
-    }
-});
-
-// Auto-save form data to prevent data loss (optional enhancement)
-const formFields = ['plantName', 'type', 'description', 'nickname'];
-
-// Load saved data on page load
-window.addEventListener('DOMContentLoaded', function() {
-    formFields.forEach(field => {
-        const savedValue = localStorage.getItem('plantForm_' + field);
-        if (savedValue && document.getElementById(field)) {   
-            document.getElementById(field).value = savedValue;
-        }
-    });
-});
-
-// Save form data to localStorage on input change
-formFields.forEach(field => {
-    const element = document.getElementById(field);
-    if (element) {
-        element.addEventListener('input', function() {
-            localStorage.setItem('plantForm_' + field, this.value);
-        });
-    }
-});
-
-// Clear saved data on successful submission
-form.addEventListener('submit', function() {
-    formFields.forEach(field => {
-        localStorage.removeItem('plantForm_' + field);
-    });
-});
-
-// Add type icons dynamically based on selection
-document.getElementById('type').addEventListener('change', function() {
-    const icons = {
-        'Succulent': 'bi-flower3',
-        'Fern': 'bi-tree',
-        'houseplant': 'bi-house',
-        'vegetable': 'bi-basket',
-        'herb': 'bi-leaf',
-        'flowering': 'bi-flower1',
-        'other': 'bi-question-circle'
+    // Create an object with the plant details
+    const plantDetails = {
+        plantName,
+        type,
+        description,
+        nickname,
+        photo
     };
 
-    const icon = icons[this.value];
-    if (icon) {
-        this.style.backgroundImage = `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='currentColor' class='${icon}'><use href='#${icon}'/></svg>")`;
+    // Check if online
+    if (navigator.onLine) {
+        // If online, send the plant details to the server
+        submitPlantDetails(plantDetails);
+    } else {
+        // If offline, save the plant details to local storage
+        openSyncPlantIDB().then((db) => {
+            addNewPlantToSync (db, plantDetails).then((data) => {
+                console.log("Plant details saved for sync to DB");
+                // Redirect to homepage after saving
+                window.location.href = "/";
+            });
+        });
     }
-});
+}
+
+// Function to submit plant details to the server
+function submitPlantDetails(plantDetails) {
+    // Create form data object
+    const formData = new FormData();
+    // Append plant details to form data
+    formData.append("plantName", plantDetails.plantName);
+    formData.append("type", plantDetails.type);
+    formData.append("description", plantDetails.description);
+    formData.append("nickname", plantDetails.nickname);
+    if (plantDetails.photo) {
+        formData.append("photo", plantDetails.photo);
+    }
+
+    // Send POST request to the server with plant details
+    fetch("/api/plants", {
+        method: "POST",
+        body: formData
+    })
+    .then(response => {
+        if (response.ok) {
+            return response.json();
+        } else {
+            throw new Error("Error submitting plant details");
+        }
+    })
+    .then(data => {
+        console.log("Plant details submitted successfully:", data);
+        // Redirect to homepage or show success message
+        window.location.href = "/";
+    })
+    .catch(error => {
+        console.error("Error submitting plant details:", error);
+        alert("Error submitting plant details. Please try again.");
+    });
+}
+
+// Function to listen for online event and sync data
+function listenForOnlineSync() {
+    window.addEventListener("online", async() => {
+        // Check if there are plants in local storage to sync and update
+        const isTherePlantsToSync = await checkIfThereIsPlantsAndUpdate();
+        // If there are no plants to sync, get plants from the server
+        if (!isTherePlantsToSync) {
+            console.log("Back online - syncing completed");
+        }
+    });
+}
