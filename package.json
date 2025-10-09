@@ -19,7 +19,8 @@
     "mongoose": "^8.18.1",
     "morgan": "~1.9.1",
     "multer": "^1.4.5-lts.1",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "tw-elements": "^2.0.0"
   },
   "devDependencies": {
     "autoprefixer": "^10.4.19",
