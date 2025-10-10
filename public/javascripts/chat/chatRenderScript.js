@@ -1,10 +1,10 @@
-const { create } = require("../../../server/models/chatModel");
+// Chat rendering utilities for client-side
 
-function createChatMessageElement(message) {
+function createChatMessageDiv(message) {
     const chatMessageDiv = document.createElement("div");
     chatMessageDiv.classList.add(
         "chat",
-        message.userName === loggedInUser ? "chat-end" : "chat-start"
+        (message.username || message.userName) === loggedInUser ? "chat-end" : "chat-start"
     );
 
     const chatImageDiv = document.createElement("div");
@@ -12,7 +12,7 @@ function createChatMessageElement(message) {
     chatImageDiv.innerHTML = `
         <div class="avatar placeholder rounded-full border bg-neutral p-1">
             <div class="text-neutral-content rounded-full bg-white w-8">
-                <span class="text font-extrabold text-neutral">${message.userName
+                <span class="text font-extrabold text-neutral">${(message.username || message.userName)
                     .substring(0, 2)
                     .toUpperCase()}</span>
             </div>
@@ -21,7 +21,7 @@ function createChatMessageElement(message) {
 
     const chatHeaderDiv = document.createElement("div");
     chatHeaderDiv.classList.add("chat-header");
-    chatHeaderDiv.textContent = message.userName;
+    chatHeaderDiv.textContent = message.username || message.userName;
 
     const chatBubbleDiv = createChatBubble(message);
     const chatFooterDiv = createChatFooter(message);
@@ -49,7 +49,7 @@ function createChatBubble(message) {
 
 function createChatFooter(chat) {
     const chatFooterDiv = document.createElement("div");
-    if (chat.userName === loggedInUser) {
+    if ((chat.username || chat.userName) === loggedInUser) {
         chatFooterDiv.classList.add("chat-footer", "flex", "flex-col", "items-end");
     } else {
         chatFooterDiv.classList.add("chat-footer", "flex", "flex-col", "items-start");
@@ -57,8 +57,8 @@ function createChatFooter(chat) {
 
     // Creating and appending the timestamp element
     const timestamp = document.createElement("time");
-    timeElement.className = "text-xs opacity-50";
-    timeElement.textContent = chat.chatTime.toLocaleString();
+    timestamp.className = "text-xs opacity-50";
+    timestamp.textContent = chat.chatTime;
     chatFooterDiv.appendChild(timestamp);
 
     return chatFooterDiv;
