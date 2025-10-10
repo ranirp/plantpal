@@ -12,9 +12,20 @@ exports.homepage = async (req, res) => {
 /**
  * Get all plant details from the database
  * Supports sorting by type, createdAt, or plantName
+ * Also supports connectivity check via ?check=true parameter
  */
 exports.getAllPlantDetails = async (req, res) => {
     try {
+        // Handle connectivity check requests
+        if (req.query.check === 'true') {
+            return res.status(200).json({
+                status: 'online',
+                message: 'Server is available',
+                timestamp: new Date().toISOString(),
+                mongoStatus: global.isMongoDBAvailable !== false ? 'connected' : 'disconnected'
+            });
+        }
+
         const { sortBy = 'createdAt', order = 'desc' } = req.query;
 
         let sortOptions = {};
