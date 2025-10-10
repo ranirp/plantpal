@@ -1,9 +1,36 @@
 var loggedInUser;
 
 function logout() {
+    // In a PWA, we only clear user data, not plant cache
     return deleteAllUsers().then(() => {
         loggedInUser = null;
         onUserLoggedOut();
+    }).catch(error => {
+        console.error("Error during logout:", error);
+        loggedInUser = null;
+        onUserLoggedOut();
+    });
+}
+
+// Function to clear all plants from IndexedDB
+function clearAllPlantsFromIndexedDB() {
+    return new Promise((resolve, reject) => {
+        // Check if the function exists (it should be loaded from addPlantUtility.js)
+        if (typeof openSyncPlantIDB === 'function' && typeof deleteAllSyncPlantsFromIDB === 'function') {
+            openSyncPlantIDB()
+                .then(db => deleteAllSyncPlantsFromIDB(db))
+                .then(() => {
+                    console.log("Successfully cleared all plants from IndexedDB during logout");
+                    resolve();
+                })
+                .catch(error => {
+                    console.error("Error clearing plants from IndexedDB during logout:", error);
+                    resolve(); // Still resolve to continue logout process
+                });
+        } else {
+            console.log("Plant IndexedDB functions not available, skipping plant data cleanup");
+            resolve();
+        }
     });
 }
 

@@ -1,14 +1,14 @@
-<div className="toast toast-center m-0 p-0 w-full hidden" id="toast">
-    <div className="alert alert-error w-full h-8 rounded-sm text-white flex place-content-center place-items-center items-center">
+<div class="toast toast-center m-0 p-0 w-full hidden" id="toast">
+    <div class="alert alert-error w-full h-8 rounded-sm text-white flex place-content-center place-items-center items-center">
         <svg 
             xmlns="http://www.w3.org/2000/svg" 
-            className="stroke-current shrink-0 h-6 w-6" 
+            class="stroke-current shrink-0 h-6 w-6" 
             fill="none" 
             viewBox="0 0 24 24">
             <path 
-                strokeLinecap="round" 
-                strokeLinejoin="round" 
-                strokeWidth="2" 
+                stroke-linecap="round" 
+                stroke-linejoin="round" 
+                stroke-width="2" 
                 d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>You are Offline, some functionalities may not work.</div>
@@ -16,18 +16,82 @@
 </div>
 
 <script>
-    if (navigator.onLine) {
-        document.getElementById('toast').classList.add('hidden');
-    } else {
-        document.getElementById('toast').classList.remove('hidden');
+    let isOnlineStatus = false; // Start as offline until verified
+    
+    // Function to check actual connectivity with the server
+    async function checkServerConnectivity() {
+        if (!navigator.onLine) {
+            return false; // If browser says offline, don't bother checking
+        }
+        
+        try {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
+            
+            const response = await fetch('/api/plants/getAllPlants?check=true', {
+                method: 'GET',
+                cache: 'no-cache',
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                },
+                signal: controller.signal
+            });
+            
+            clearTimeout(timeoutId);
+            return response.ok;
+        } catch (error) {
+            console.log('Server connectivity check failed:', error.message);
+            return false;
+        }
     }
+    
+    // Function to update UI based on connectivity status
+    function updateOnlineStatus(isOnline) {
+        const toast = document.getElementById('toast');
+        if (isOnline) {
+            toast.classList.add('hidden');
+            console.log('✅ Status: ONLINE - Connected to server');
+        } else {
+            toast.classList.remove('hidden');
+            console.log('❌ Status: OFFLINE - Not connected to server');
+        }
+        isOnlineStatus = isOnline;
+    }
+    
+    // Initial check - verify actual connectivity on page load
+    (async () => {
+        console.log('🔍 Checking initial connectivity status...');
+        const actuallyOnline = await checkServerConnectivity();
+        updateOnlineStatus(actuallyOnline);
+    })();
 
-    window.addEventListener('online', () => {
-        console.log('You are online...Connected!');
-        document.getElementById('toast').classList.add('hidden');
+    window.addEventListener('online', async () => {
+        console.log('🌐 Navigator reports online - verifying server connectivity...');
+        // Add a small delay to let network stabilize
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const actuallyOnline = await checkServerConnectivity();
+        updateOnlineStatus(actuallyOnline);
+        if (actuallyOnline) {
+            console.log('✅ Confirmed: You are online and connected!');
+        } else {
+            console.log('⚠️  Navigator says online but server is unreachable');
+        }
     });
+    
     window.addEventListener('offline', () => {
-        console.log('You are offline...Disconnected!');
-        document.getElementById('toast').classList.remove('hidden');
+        console.log('📡 Navigator reports offline');
+        updateOnlineStatus(false);
     });
+    
+    // More aggressive periodic connectivity check - every 10 seconds
+    setInterval(async () => {
+        const actuallyOnline = await checkServerConnectivity();
+        // Only update if status changed
+        if (actuallyOnline !== isOnlineStatus) {
+            console.log(`🔄 Status changed: ${isOnlineStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
+            updateOnlineStatus(actuallyOnline);
+        }
+    }, 10000); // Check every 10 seconds
 </script>
