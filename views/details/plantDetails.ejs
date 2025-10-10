@@ -15,14 +15,21 @@
         <div class="flex flex-col h-screen w-full lg:flex-row">
             <!-- Plant Details Section -->
             <div class="lg:w-1/2 h-full mx-5 py-5 overflow-y-auto">
-                <%- include('./detailsComponent.ejs', { data: data}) %>
+                <%- include('./plantDetailsComponent.ejs', { data: data}) %>
             </div>
 
             <!-- Chat Section -->
-            <div class="lg:w-1/2 h-full mx-5 py-5">
-                <%- include('./chat.ejs', { data: data, userName: username }) %>
+            <div class="lg:w-1/2 h-full mx-5 py-5 flex flex-col">
+                <div class="flex-1">
+                    <%- include('../chat/chat.ejs', { data: data, userName: username }) %>
+                </div>
             </div>
         </div>
-            <%- include('../components/onlineOfflineMode.ejs') %>
+        
+        <%- include('../components/onlineOfflineMode.ejs') %>
+        
+        <!-- Load plant details functionality -->
+        <script src="/javascripts/addPlant/addPlantUtility.js"></script>
+        <script src="/javascripts/details/plantDetailsScript.js"></script>
     </body>
 </html>

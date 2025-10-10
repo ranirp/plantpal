@@ -6,28 +6,67 @@ const SYNC_PLANT_EVENT = 'plant';
 
 /**
  * Function to add a new plant to the IndexedDB for synced plants.
+ * Prevents duplicates by checking for existing plants with the same _id.
  * @param {IDBDatabase} plantDB - IndexedDB instance for synced plants.
  * @param {Object} plantDetails - Details of the plant to be added.
  * @returns {Promise} - Promise resolving to the added plant details.
  */
 const addNewPlantToSync = (plantDB, plantDetails) => {
-    return new Promise((resolve, reject) => {
-        const transaction = plantDB.transaction([SYNC_PLANT_STORE_NAME], 'readwrite');
-        const plantStore = transaction.objectStore(SYNC_PLANT_STORE_NAME);
-        const addRequest = plantStore.add({ value: plantDetails });
-        addRequest.addEventListener('success', () => {
-            console.log("Added " + "#" + addRequest.result + ": " + plantDetails);
-            const getRequest = plantStore.get(addRequest.result);
-            getRequest.addEventListener('success', () => {
-                resolve(getRequest.result);
+    return new Promise(async (resolve, reject) => {
+        try {
+            // First, check if a plant with the same _id already exists (for server plants)
+            if (plantDetails._id && plantDetails.__isServerPlant) {
+                const existingPlants = await getAllSyncPlants(plantDB);
+                const existingPlant = existingPlants.find(item => {
+                    const plant = item.value || item;
+                    return plant._id === plantDetails._id;
+                });
+                
+                if (existingPlant) {
+                    // Plant already exists - update it instead
+                    console.log(`Plant with _id ${plantDetails._id} already exists, updating...`);
+                    const transaction = plantDB.transaction([SYNC_PLANT_STORE_NAME], 'readwrite');
+                    const plantStore = transaction.objectStore(SYNC_PLANT_STORE_NAME);
+                    const updatedPlant = { 
+                        id: existingPlant.id, 
+                        value: { ...plantDetails, __lastSyncTime: Date.now() } 
+                    };
+                    const putRequest = plantStore.put(updatedPlant);
+                    
+                    putRequest.addEventListener('success', () => {
+                        console.log(`Updated plant #${existingPlant.id}`);
+                        resolve(updatedPlant);
+                    });
+                    
+                    putRequest.addEventListener('error', (event) => {
+                        reject(event.target.error);
+                    });
+                    return;
+                }
+            }
+            
+            // Plant doesn't exist, add it
+            const transaction = plantDB.transaction([SYNC_PLANT_STORE_NAME], 'readwrite');
+            const plantStore = transaction.objectStore(SYNC_PLANT_STORE_NAME);
+            const addRequest = plantStore.add({ value: plantDetails });
+            
+            addRequest.addEventListener('success', () => {
+                console.log(`Added plant #${addRequest.result}: ${plantDetails.plantName}`);
+                const getRequest = plantStore.get(addRequest.result);
+                getRequest.addEventListener('success', () => {
+                    resolve(getRequest.result);
+                });
+                getRequest.addEventListener('error', (event) => {
+                    reject(event.target.error);
+                });
             });
-            getRequest.addEventListener('error', (event) => {
+            
+            addRequest.addEventListener('error', (event) => {
                 reject(event.target.error);
             });
-        });
-        addRequest.addEventListener('error', (event) => {
-            reject(event.target.error);
-        });
+        } catch (error) {
+            reject(error);
+        }
     });
 };
 
@@ -137,9 +176,34 @@ const getAllPlantsFromIDB = () => {
             const syncPlants = await getAllSyncPlants(db);
             const plants = syncPlants.map(item => {
                 const plant = item.value || item;
-                // Remove internal flags when returning plants for display
+                // Remove internal flags and clean up photo metadata when returning plants for display
                 const cleanPlant = { ...plant };
                 delete cleanPlant.__isServerPlant;
+                delete cleanPlant.__syncStatus;
+                delete cleanPlant.__lastSyncTime;
+                
+                // Ensure all plants have an _id field
+                if (!cleanPlant._id) {
+                    // Generate a temporary ID for plants that don't have one
+                    const timestamp = cleanPlant.createdAt || cleanPlant.dateAdded || Date.now();
+                    const nickname = cleanPlant.nickname || 'unknown';
+                    const plantName = cleanPlant.plantName || 'unnamed';
+                    cleanPlant._id = `offline_${plantName}_${nickname}_${timestamp}`.replace(/[^a-zA-Z0-9_]/g, '_');
+                    console.log('Generated temporary ID for plant without _id:', cleanPlant._id);
+                }
+                
+                // Clean up photo metadata - if it's an object with metadata, convert to string filename
+                if (cleanPlant.photo && typeof cleanPlant.photo === 'object' && cleanPlant.photo.name) {
+                    // This was an offline uploaded photo, but if the plant has an _id, it means it's been synced
+                    // and the photo is no longer available, so we should remove the photo reference
+                    if (cleanPlant._id && !cleanPlant._id.startsWith('offline_')) {
+                        cleanPlant.photo = null; // Remove photo reference for synced plants that had offline photos
+                    } else {
+                        // Keep the metadata for truly offline plants
+                        cleanPlant.photo = cleanPlant.photo;
+                    }
+                }
+                
                 return cleanPlant;
             });
             resolve(plants);

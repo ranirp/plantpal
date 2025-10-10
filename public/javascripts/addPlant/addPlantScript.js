@@ -45,6 +45,35 @@ function getUserName() {
     });
 }
 
+// Function to check actual server connectivity
+async function checkServerConnectivity() {
+    if (!navigator.onLine) {
+        return false; // If browser says offline, don't bother checking
+    }
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const response = await fetch('/api/plants/getAllPlants?check=true', {
+            method: 'GET',
+            cache: 'no-cache',
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            },
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        return response.ok;
+    } catch (error) {
+        console.log('Server connectivity check failed:', error.message);
+        return false;
+    }
+}
+
 // Function to setup image preview functionality
 function setupImagePreview() {
     console.log("Setting up image preview...");
@@ -167,31 +196,51 @@ function addNewPlantDetails() {
         createdAt: new Date().toISOString() // Add timestamp for offline plants
     };
 
-    // Check if online
-    if (navigator.onLine) {
-        // If online, send the plant details to the server
-        submitPlantDetails(plantDetails);
-    } else {
-        // If offline, save the plant details to local storage
-        // Note: We can't store the actual File object, so we'll store metadata
-        const offlinePlantDetails = {
-            ...plantDetails,
-            photo: photo ? {
-                name: photo.name,
-                size: photo.size,
-                type: photo.type,
-                lastModified: photo.lastModified
-            } : null
-        };
-        
-        openSyncPlantIDB().then((db) => {
-            addNewPlantToSync (db, offlinePlantDetails).then((data) => {
-                console.log("Plant details saved for sync to DB");
-                // Redirect to homepage after saving
-                window.location.href = "/";
+    // Check if actually online by verifying server connectivity
+    checkServerConnectivity().then((isActuallyOnline) => {
+        if (isActuallyOnline) {
+            // If online, send the plant details to the server
+            console.log("✅ Online - Submitting plant to server");
+            submitPlantDetails(plantDetails);
+        } else {
+            // If offline, save the plant details to IndexedDB
+            console.log("❌ Offline - Saving plant locally for later sync");
+            // Note: We can't store the actual File object, so we'll store metadata
+            const timestamp = Date.now();
+            const tempId = `offline_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+            
+            const offlinePlantDetails = {
+                ...plantDetails,
+                _id: tempId, // Add temporary ID for offline plants
+                photo: photo ? {
+                    name: photo.name,
+                    size: photo.size,
+                    type: photo.type,
+                    lastModified: photo.lastModified
+                } : null,
+                __isServerPlant: false,
+                __syncStatus: 'pending',
+                __createdOffline: true,
+                __lastSyncTime: null,
+                __tempId: tempId // Keep track of the temporary ID
+            };
+            
+            openSyncPlantIDB().then((db) => {
+                addNewPlantToSync (db, offlinePlantDetails).then((data) => {
+                    console.log("✅ Plant details saved offline for later sync");
+                    alert("🌱 Plant saved offline! It will be synced when you're back online.");
+                    // Redirect to homepage after saving
+                    window.location.href = "/";
+                }).catch((error) => {
+                    console.error("Error saving plant offline:", error);
+                    alert("❌ Error saving plant. Please try again.");
+                });
             });
-        });
-    }
+        }
+    }).catch((error) => {
+        console.error("Error checking connectivity:", error);
+        alert("❌ Error checking connection. Please try again.");
+    });
 }
 
 // Function to submit plant details to the server

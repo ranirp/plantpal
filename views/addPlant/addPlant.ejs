@@ -11,26 +11,9 @@
         />
         <script src="/javascripts/addPlant/addPlantScript.js"></script>
         <script src="/javascripts/addPlant/addPlantUtility.js"></script>
+        <script src="/javascripts/user/userIDBScript.js"></script>
     </head>
     <body onload="init()" class="min-h-screen bg-gray-50">
-        <!-- Online/Offline Status Banner -->
-        <div class="w-full fixed top-0 z-50" id="toast">
-            <div class="alert alert-error w-full py-2 rounded-none text-white flex place-content-center place-items-center items-center">
-                <svg 
-                    xmlns="http://www.w3.org/2000/svg" 
-                    class="stroke-current shrink-0 h-5 w-5" 
-                    fill="none" 
-                    viewBox="0 0 24 24">
-                    <path 
-                        stroke-linecap="round" 
-                        stroke-linejoin="round" 
-                        stroke-width="2" 
-                        d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div>You are Offline, some functionalities may not work.</div>
-            </div>
-        </div>
-
         <div class="container mx-auto max-w-7xl mt-16 px-4 py-8">
             <div class="bg-white shadow-xl rounded-xl overflow-hidden">
                 <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[700px]">
@@ -146,22 +129,6 @@
             </div>
         </div>
 
-        <script>
-            if (navigator.onLine) {
-                document.getElementById('toast').classList.add('hidden');
-            } else {
-                document.getElementById('toast').classList.remove('hidden');
-            }
-
-            window.addEventListener('online', () => {
-                console.log('You are online...Connected!');
-                document.getElementById('toast').classList.add('hidden');
-            });
-            
-            window.addEventListener('offline', () => {
-                console.log('You are offline...Disconnected!');
-                document.getElementById('toast').classList.remove('hidden');
-            });
-        </script>
+        <%- include('../components/onlineOfflineMode.ejs') %>
     </body>
 </html>
