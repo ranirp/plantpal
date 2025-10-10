@@ -1,9 +1,8 @@
 // Constants for IndexedDB database and object store names
-const PLANT_DB_NAME = 'plant';
+const PLANT_IDB_NAME = 'plantIDB';
 const PLANT_DETAILS_STORE_NAME = 'plantDetails';
 const SYNC_PLANT_STORE_NAME = 'plants';
 const SYNC_PLANT_EVENT = 'plant';
-const SYNC_PLANT_DB = 'plantDB';
 
 /**
  * Function to add a new plant to the IndexedDB for synced plants.
