@@ -13,45 +13,123 @@ function init() {
     listenForOnlineSync();
 }
 
-function listenForOnlineSync() {
-    if (navigator.onLine) {
-        changeOnlineStatus(true);
-    } else {
-        changeOnlineStatus(false);
+// Function to check actual server connectivity
+async function checkServerConnectivity() {
+    if (!navigator.onLine) {
+        return false; // If browser says offline, don't bother checking
     }
+    
+    try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
+        
+        const response = await fetch("/api/plants/getAllPlants?check=true", {
+            method: "GET",
+            cache: "no-cache",
+            headers: {
+                'Cache-Control': 'no-cache, no-store, must-revalidate',
+                'Pragma': 'no-cache',
+                'Expires': '0'
+            },
+            signal: controller.signal
+        });
+        
+        clearTimeout(timeoutId);
+        return response.ok;
+    } catch (error) {
+        console.log("Server connectivity check failed:", error.message);
+        return false;
+    }
+}
 
-    window.addEventListener('online', function () {
-        changeOnlineStatus(true);
-        console.log("You are online now");
-        openSyncChatsIDB().then((db) => {
-            getAllSyncChatMessages(db).then((syncChats) => {
-                syncChats.forEach((data) => {
-                    console.log("Syncing data offline chat", data.value);
-                    addChatToDB(data.value);
-                    deleteAllSyncPlantsFromIDB(db, data.id);
+function listenForOnlineSync() {
+    // Check initial status with server connectivity
+    console.log("🔍 Checking initial connectivity for chat...");
+    checkServerConnectivity().then(isOnline => {
+        console.log(`Chat connectivity check: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+        changeOnlineStatus(isOnline);
+    });
+
+    window.addEventListener('online', async function () {
+        console.log("🌐 Navigator reports online, checking server connectivity...");
+        // Add a small delay to let network stabilize
+        await new Promise(resolve => setTimeout(resolve, 500));
+        const actuallyOnline = await checkServerConnectivity();
+        changeOnlineStatus(actuallyOnline);
+        
+        if (actuallyOnline) {
+            console.log("✅ You are online now - syncing offline chat messages");
+            
+            // Sync offline chat messages
+            openSyncChatsIDB().then((db) => {
+                getAllSyncChatMessages(db).then((syncChats) => {
+                    if (syncChats.length > 0) {
+                        console.log(`📤 Found ${syncChats.length} offline chat messages to sync`);
+                        syncChats.forEach((data) => {
+                            console.log("Syncing offline chat message:", data.value);
+                            addChatToDB(data.value);
+                            deleteSyncChatFromIDB(db, data.id);
+                        });
+                    } else {
+                        console.log("No offline chat messages to sync");
+                    }
                 });
             });
-        });
+        } else {
+            console.log("⚠️  Navigator says online but server is unreachable");
+        }
     });
 
     window.addEventListener('offline', function () {
         changeOnlineStatus(false);
-        console.log("You are offline now");
+        console.log("❌ You are offline now");
     });
+    
+    // More aggressive periodic check every 10 seconds
+    setInterval(async () => {
+        const actuallyOnline = await checkServerConnectivity();
+        const currentStatus = document.getElementById('onlineText')?.innerHTML === 'Online';
+        // Only update if status changed
+        if (actuallyOnline !== currentStatus) {
+            console.log(`🔄 Chat status changed: ${currentStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
+            changeOnlineStatus(actuallyOnline);
+        }
+    }, 10000); // Check every 10 seconds
 }
 
 function changeOnlineStatus(isOnline) {
     const onlineColorDiv = document.getElementById('onlineColor');
     const onlineText = document.getElementById('onlineText');
+    const offlineInfo = document.getElementById('offlineInfo');
+    const offlineInfoText = document.getElementById('offlineInfoText');
+    
     if (onlineColorDiv && onlineText) {
         if (isOnline) {
             onlineText.innerHTML = "Online";
-            onlineColorDiv.classList.add("bg-red-500");
-            onlineColorDiv.classList.remove("bg-green-500");
+            onlineColorDiv.classList.remove("bg-red-500");
+            onlineColorDiv.classList.add("bg-green-500");
+            if (offlineInfo) offlineInfo.classList.add('hidden');
         } else {
             onlineText.innerHTML = "Offline";
-            onlineColorDiv.classList.add("bg-red-500");
             onlineColorDiv.classList.remove("bg-green-500");
+            onlineColorDiv.classList.add("bg-red-500");
+            
+            // Show offline info and check if user can chat
+            if (offlineInfo && offlineInfoText) {
+                isUserOwnPlant(plantId, loggedInUser).then(canChatOffline => {
+                    if (canChatOffline) {
+                        offlineInfoText.textContent = "Offline: You can still message your own plant";
+                        offlineInfo.classList.remove('hidden');
+                        offlineInfo.classList.add('text-blue-600');
+                        offlineInfo.classList.remove('text-red-600');
+                    } else {
+                        offlineInfoText.textContent = "Offline: Cannot message other users' plants";
+                        offlineInfo.classList.remove('hidden');
+                        offlineInfo.classList.add('text-red-600');
+                        offlineInfo.classList.remove('text-blue-600');
+                    }
+                });
+            }
         }
     }
 }
@@ -68,7 +146,7 @@ function registerFormSubmit() {
     }
 }
 
-function sendMessage(isSuggestingName = false) {
+async function sendMessage(isSuggestingName = false) {
     var input = document.getElementById("chatInput");
     if (!input || input.value.trim() === "") {
         return;
@@ -81,21 +159,62 @@ function sendMessage(isSuggestingName = false) {
         chattime: new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
     };
 
-    openSyncChatsIDB().then((db) => {
-        addNewChatToSync(db, chatMessage).then((data) => {
+    // Check actual connectivity
+    const isActuallyOnline = navigator.onLine && await checkServerConnectivity();
+    
+    if (isActuallyOnline) {
+        // Online: Send message directly
+        input.value = ""; // Clear input field
+        console.log("Sending chat message (online):", chatMessage);
+        addChatToDB(chatMessage);
+        socket.emit("chat", chatMessage);
+    } else {
+        // Offline: Check if this is user's own plant
+        if (await isUserOwnPlant(plantId, loggedInUser)) {
+            // User can add messages to their own plants when offline
             input.value = ""; // Clear input field
+            console.log("Adding offline message to user's own plant:", chatMessage);
+            
+            // Store message in IndexedDB for later sync
+            openSyncChatsIDB().then((db) => {
+                addNewChatToSync(db, chatMessage).then(() => {
+                    console.log("Chat message queued for sync");
+                    renderChatMessage([chatMessage]); // Show message immediately in UI
+                });
+            });
+        } else {
+            // Not user's plant - cannot chat offline
+            alert("You can only send messages to your own plants when offline.\n\nWhen offline, you can:\n✅ Message plants you created\n❌ Not message other users' plants\n\nPlease connect to internet to chat with all plants.");
+            return;
+        }
+    }
+}
 
-            if (navigator.onLine) {
-                console.log("Sending chat message:", chatMessage);
-                addChatToDB(chatMessage);
-                socket.emit("chat", chatMessage);
-                deleteSyncChatFromIDB(db, data.id);
-            } else {
-                console.log("Chat added to sync IDB (offline)");
-                renderChatMessage([chatMessage]);
+// Function to check if the current plant belongs to the logged-in user
+async function isUserOwnPlant(plantId, username) {
+    try {
+        // First try to check from server if online
+        if (navigator.onLine) {
+            const response = await fetch(`/plantDetails/checkOwnership/${plantId}/${username}`);
+            if (response.ok) {
+                const data = await response.json();
+                return data.isOwner;
             }
+        }
+        
+        // Fallback: check from IndexedDB
+        const db = await openSyncPlantIDB();
+        const plants = await getAllSyncPlants(db);
+        const plant = plants.find(p => {
+            const plantData = p.value || p;
+            return (plantData._id === plantId || p.id === plantId) && plantData.nickname === username;
         });
-    });
+        
+        return !!plant;
+    } catch (error) {
+        console.error("Error checking plant ownership:", error);
+        return false; // Default to not allowing offline chat if we can't verify
+    }
 }
 
 function registerSocket() {
