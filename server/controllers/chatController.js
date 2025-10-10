@@ -22,13 +22,25 @@ exports.chatPage =  async (req, res, next) => {
  */
 exports.getChatMessagesByPlantId = async (req, res, next) => {
     try {
-        const plantID = req.params.plantID;
+        // Handle both parameter formats: :plantID and :id
+        const plantID = req.params.plantID || req.params.id;
         console.log("Getting chat messages for plantID:", plantID);
+
+        if (!plantID) {
+            return res.status(400).json({
+                success: false,
+                message: "Plant ID is required"
+            });
+        }
 
         const chats = await ChatMessage.find({ plantID: plantID }).sort({ chatTime: -1 });
 
         console.log(`Chat messages retrieved successfully! Count: ${chats.length}`);
-        res.json(chats);
+        res.json({
+            success: true,
+            count: chats.length,
+            messages: chats
+        });
     } catch (err) {
         console.error('Error retrieving chat messages:', err);
         res.status(500).json({
@@ -44,14 +56,46 @@ exports.getChatMessagesByPlantId = async (req, res, next) => {
  */
 exports.addChatMessage = async (req, res, next) => {
     try {
-        const chatMessage = req.body.chatMessage;
+        // Check if we're receiving data through req.body directly or via req.body.chatMessage
+        let chatData;
+        
+        if (req.body.chatmessage) {
+            // Direct structure from client
+            chatData = {
+                plantID: req.body.plantId || req.params.id,
+                username: req.body.username,
+                chatMessage: req.body.chatmessage,
+                chatTime: req.body.chattime
+            };
+        } else if (req.body.chatMessage) {
+            // Nested structure
+            chatData = {
+                plantID: req.body.chatMessage.plantID || req.params.id,
+                username: req.body.chatMessage.username,
+                chatMessage: req.body.chatMessage.chatMessage,
+                chatTime: req.body.chatMessage.chatTime
+            };
+        } else {
+            // Try direct access for backward compatibility
+            chatData = {
+                plantID: req.body.plantId || req.params.id,
+                username: req.body.username,
+                chatMessage: req.body.chatmessage || req.body.message,
+                chatTime: req.body.chattime || req.body.timestamp
+            };
+        }
+
+        // Log the received data for debugging
+        console.log("Received chat data:", req.body);
+        console.log("Processed chat data:", chatData);
 
         // Validate required fields
-        if (!chatMessage || !chatMessage.plantID || !chatMessage.username || !chatMessage.chatMessage) {
+        if (!chatData.plantID || !chatData.username || !chatData.chatMessage) {
             return res.status(400).json({
                 success: false,
                 message: "Missing required fields",
-                required: ["plantID", "username", "chatMessage"]
+                required: ["plantID", "username", "chatMessage"],
+                received: chatData
             });
         }
 
@@ -61,10 +105,10 @@ exports.addChatMessage = async (req, res, next) => {
             .replace(/\..+/, '');
 
         const newChatMessage = new ChatMessage({
-            plantID: chatMessage.plantID,
-            username: chatMessage.username,
-            chatMessage: chatMessage.chatMessage,
-            chatTime: chatMessage.chatTime || timestamp
+            plantID: chatData.plantID,
+            username: chatData.username,
+            chatMessage: chatData.chatMessage,
+            chatTime: chatData.chatTime || timestamp
         });
         
         console.log("Adding new chat message:", newChatMessage);

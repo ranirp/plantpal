@@ -1,11 +1,59 @@
-const { render } = require("ejs");
-const chatMessage = require("../../../server/models/chatModel");
+// Client-side doesn't support Node.js style requires
+// const { render } = require("ejs");
+// const chatMessage = require("../../../server/models/chatModel");
 
-let socket = io();
+// Initialize socket when DOM is ready to prevent undefined io error
+let socket;
+document.addEventListener('DOMContentLoaded', function() {
+    console.log("Initializing socket connection...");
+    
+    // Initialize socket with connection options
+    socket = io({
+        autoConnect: true,
+        reconnection: true,
+        reconnectionDelay: 1000,
+        reconnectionAttempts: 5,
+        timeout: 20000,
+        forceNew: false
+    });
+    
+    // Socket connection events
+    socket.on('connect', function() {
+        console.log('✅ Socket connected successfully');
+    });
+    
+    socket.on('disconnect', function() {
+        console.log('❌ Socket disconnected');
+    });
+    
+    socket.on('connect_error', function(error) {
+        console.error('❌ Socket connection error:', error);
+    });
+    
+    console.log("Socket.io initialized");
+});
+
 const urlParams = new URLSearchParams(window.location.search);
 var chatMessages = [];
 
 function init() {
+    // Make sure socket is initialized
+    if (!socket) {
+        socket = io();
+        console.log("Socket.io initialized in init()");
+    }
+    
+    // Check if plantId exists
+    if (typeof plantId === 'undefined' || !plantId) {
+        console.error("plantId is not defined in init()");
+        // Try to get it from URL if possible
+        const pathParts = window.location.pathname.split('/');
+        if (pathParts.length > 2) {
+            plantId = pathParts[2];
+            console.log("Extracted plantId from URL:", plantId);
+        }
+    }
+    
     joinPlantChatRoom();
     getChatHistory(plantId);
     registerSocket();
@@ -16,28 +64,60 @@ function init() {
 // Function to check actual server connectivity
 async function checkServerConnectivity() {
     if (!navigator.onLine) {
-        return false; // If browser says offline, don't bother checking
+        console.log('📡 Browser reports device is offline');
+        return false;
     }
     
     try {
+        // Use a timestamp to prevent caching
+        const timestamp = new Date().getTime();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced timeout
+        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 seconds timeout
         
-        const response = await fetch("/api/plants/getAllPlants?check=true", {
+        // First try a direct chat-specific endpoint
+        const chatCheckEndpoint = `/api/chat/ping?_=${timestamp}`;
+        console.log(`🔄 Testing chat connectivity with: ${chatCheckEndpoint}`);
+        
+        try {
+            const chatResponse = await fetch(chatCheckEndpoint, {
+                method: "GET",
+                cache: "no-cache",
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0',
+                    'X-Requested-With': 'XMLHttpRequest'
+                },
+                signal: controller.signal
+            });
+            
+            if (chatResponse.ok) {
+                console.log('✅ Chat API is responsive');
+                clearTimeout(timeoutId);
+                return true;
+            }
+        } catch (chatError) {
+            console.log('Chat endpoint check failed, trying fallback:', chatError.message);
+        }
+        
+        // Fallback to general API check
+        const response = await fetch(`/api/plants/getAllPlants?check=true&_=${timestamp}`, {
             method: "GET",
             cache: "no-cache",
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
-                'Expires': '0'
+                'Expires': '0',
+                'X-Requested-With': 'XMLHttpRequest'
             },
             signal: controller.signal
         });
         
         clearTimeout(timeoutId);
+        console.log(`📶 Server responded with status: ${response.status}`);
         return response.ok;
     } catch (error) {
-        console.log("Server connectivity check failed:", error.message);
+        console.log('📡 Server connectivity check failed:', error.message);
         return false;
     }
 }
@@ -237,60 +317,99 @@ function registerSocket() {
 }
 
 function addChatToDB(message) {
-    fetch('/chat/addChatMessage', {
+    console.log("Sending message to database:", message);
+    
+    // Use the correct endpoint pattern: /api/chat/plants/{plantId}/messages
+    const chatEndpoint = `/api/chat/plants/${message.plantId}/messages`;
+    console.log("Using endpoint:", chatEndpoint);
+    
+    fetch(chatEndpoint, {
         method: 'POST',
         headers: {
             'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-            chatMessage: message,
-        }),
+            chatmessage: message.chatmessage,
+            username: message.username,
+            plantId: message.plantId,
+            chattime: message.chattime
+        })
     })
-        .then(async (response) => {
-            if (response.ok) {
-                return response.json();
-            } else {
-                throw new Error("Failed to add chat message");
-            }
-        })
-        .then((chatMessage) => {
-            console.log("Chat message added to DB:", chatMessage);
-        })
-        .catch((error) => {
-            console.error("Error adding chat message to DB:", error.message);
-        });
+    .then(response => {
+        console.log("Chat response status:", response.status);
+        return response.json();
+    })
+    .then(data => {
+        if (data.success) {
+            console.log('✅ Chat message saved to database:', data);
+            // Immediately render the message in the UI
+            renderChatMessages([message]);
+        } else {
+            console.error('❌ Failed to save chat message:', data);
+        }
+    })
+    .catch(error => {
+        console.error('❌ Error saving chat message:', error);
+    });
 }
 
 function joinPlantChatRoom() {
     console.log("Joining plant chat room:");
+    if (typeof plantId === 'undefined') {
+        console.error('plantId is not defined');
+        return;
+    }
     var roomNo = plantId;
     var name = loggedInUser;
-    socket.emit("create or join", roomNo, name);
+    socket.emit("createorjoin", roomNo, name);
 }
 
 function getChatHistory(plantId) {
-    fetch(`/chat/getChatMessages/${plantId}`)
+    console.log("Fetching chat history for plant:", plantId);
+    
+    // Use the correct endpoint pattern: /api/chat/plants/{plantId}/messages
+    const historyEndpoint = `/api/chat/plants/${plantId}/messages`;
+    console.log("Using endpoint:", historyEndpoint);
+    
+    fetch(historyEndpoint)
         .then(async (response) => {
+            console.log("Chat history response status:", response.status);
             if (response.ok) {
                 return response.json();
             } else {
-                throw new Error("Failed to fetch chat history");
+                throw new Error(`Failed to fetch chat history: ${response.status}`);
             }
         })
-        .then((chatMessages) => {
-            console.log("Chat history fetched:", chatMessages);
-            renderChatMessages(chatMessages);
+        .then((data) => {
+            console.log("Chat history data received:", data);
+            
+            // Handle both response formats
+            const chatMessages = data.messages || data;
+            
+            if (Array.isArray(chatMessages)) {
+                console.log(`Fetched ${chatMessages.length} chat messages`);
+                renderChatMessages(chatMessages);
+            } else {
+                console.error("Received invalid chat data format:", data);
+                renderChatMessages([]);
+            }
         })
         .catch((error) => {
             console.error("Error fetching chat history:", error.message);
+            // Try to show offline messages if available
+            renderChatMessages([]);
         });
 }
 
 function renderChatMessages(messages) {
     try {
         const chatContainer = document.getElementById("chatmessages");
-        if (!chatContainer) 
+        if (!chatContainer) {
+            console.error("Chat container not found!");
             return;
+        }
+
+        console.log("Rendering chat messages:", messages);
 
         // Clear no messages div if present
         const noMessagesDiv = document.getElementById("noMessagesDiv");
@@ -298,7 +417,7 @@ function renderChatMessages(messages) {
             chatContainer.removeChild(noMessagesDiv);
         }
 
-        if (chatMessages.length === 0) {
+        if (!messages || messages.length === 0) {
             const noMessagesDiv = document.createElement("div");
             noMessagesDiv.id = "noMessagesDiv";
             noMessagesDiv.classList.add(
@@ -322,8 +441,9 @@ function renderChatMessages(messages) {
             noMessagesDiv.appendChild(noMessagesText);
             chatContainer.appendChild(noMessagesDiv);
         } else {
-            chatMessages.forEach((message) => {
-                let chatTime = new Date(message.chattime);
+            messages.forEach((message) => {
+                // Handle both chattime and chatTime formats
+                let chatTime = new Date(message.chattime || message.chatTime);
                 let formattedChatTime = chatTime.toLocaleString("en-US", {
                     month: "long",
                     day: "numeric",

@@ -8,6 +8,15 @@ const chatController = require('../controllers/chatController');
 
 var router = express.Router();
 
+// Ping endpoint for checking chat connectivity
+router.get('/ping', (req, res) => {
+    res.status(200).json({
+        status: 'success',
+        message: 'Chat service is online',
+        timestamp: new Date().toISOString()
+    });
+});
+
 // Route to add a new chat message for a specific plant
 router.post('/plants/:id/messages', (req, res, next) => {
     // Attach plantId from URL params to request body
