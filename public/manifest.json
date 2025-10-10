@@ -1,0 +1,22 @@
+{
+    "name": "PlantPal - Plant Sharing Community",
+    "short_name": "PlantPal",
+    "description": "A progressive web app for sharing plants and care tips with the community",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#4CAF50",
+    "orientation": "any",
+    "icons": [
+        {
+            "src": "/images/icon1.jpg",
+            "sizes": "512x512",
+            "type": "image/jpg"
+        },
+        {
+            "src": "/images/icon2.jpg",
+            "sizes": "192x192",
+            "type": "image/jpg"
+        }
+    ]
+}

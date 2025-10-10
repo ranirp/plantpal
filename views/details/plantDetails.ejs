@@ -5,6 +5,7 @@
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
         <title><%= data.plantName %> - Plant Details</title>
         <link rel="stylesheet" href="/css/output.css" />
+        <link rel="manifest" href="/manifest.json"/>
         <script>
             loggedInUser = "<%= username %>";
             plantId = "<%= data._id %>";
@@ -27,9 +28,5 @@
         </div>
         
         <%- include('../components/onlineOfflineMode.ejs') %>
-        
-        <!-- Load plant details functionality -->
-        <script src="/javascripts/addPlant/addPlantUtility.js"></script>
-        <script src="/javascripts/details/plantDetailsScript.js"></script>
     </body>
 </html>
