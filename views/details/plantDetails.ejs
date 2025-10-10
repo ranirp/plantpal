@@ -18,6 +18,11 @@
                 <%- include('./detailsComponent.ejs', { data: data}) %>
             </div>
 
+            <!-- Chat Section -->
+            <div class="lg:w-1/2 h-full mx-5 py-5">
+                <%- include('./chat.ejs', { data: data, userName: username }) %>
+            </div>
+        </div>
             <%- include('../components/onlineOfflineMode.ejs') %>
     </body>
 </html>
