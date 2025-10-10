@@ -3,15 +3,13 @@
     <head>
         <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
         <link rel="stylesheet" href="/css/outputStyles.css" />
-        <script src="/javascripts/user/userScript.js"></script>
-        <script src="/javascripts/user/userRenderScript.js"></script>
-        <script src="/javascripts/addPlant/addPlantUtility.js"></script>
-        <script src="/javascripts/chat/chatIDBScript.js"></script>
         <script src="/javascripts/chat/chatScript.js"></script>
         <script src="/javascripts/chat/chatRenderScript.js"></script>
+        <script src="/javascripts/chat/chatIDBUtility.js"></script>
+        <link rel="manifest" href="/manifest.json"/>
+        <script src="/javascript/user/userRenderScript.js"></script>
         <script>
             var plantId = '<%= data._id %>';
-            var loggedInUser = '<%= username %>';
         </script>
     </head>
 
@@ -27,10 +25,6 @@
                         <div class="rounded-full w-4 h-4 shadow-xl" id="onlineColor"></div>
                         <div id="onlineText" class="pl-2"></div>
                     </div>
-                </div>
-                <div id="offlineInfo" class="text-sm text-gray-600 hidden">
-                    <i class="fas fa-info-circle mr-1"></i>
-                    <span id="offlineInfoText">Offline mode: Limited to your own plants</span>
                 </div>
             </div>
             <div class="flex flex-col lg:h-full h-[300px] mx-2 overflow-scroll py-9" id="chatMessages"></div>
