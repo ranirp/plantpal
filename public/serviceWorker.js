@@ -1,68 +1,105 @@
 const CACHE_NAME = 'plantpal-cache-v1';
-const urlsToCache = [
-    '/',
-    '/css/outputStyles.css',
-    '/javascripts/homepage/homepageRenderScript.js',
-    '/javascripts/homepage/homepageScript.js',
-    '/javascripts/addPlant/addPlantScript.js',
-    '/javascripts/chat/chatScript.js',
-    '/images/logo.jpg',
-    '/images/noplant.jpg',
-    '/images/placeholder.jpg',
-    '/images/chat.jpg'
-];
 
-// Install event - cache static assets
-self.addEventListener('install', event => {
+console.log("Service Worker: Registered");
+
+function log(message) {
+    console.log("Service Worker: " + message);
+}
+
+// Use the install event to pre-cache all initial resources
+self.addEventListener("install", (event) => {
+    log("Service Worker: Installing....");
     event.waitUntil(
-        caches.open(CACHE_NAME)
-            .then(cache => {
-                console.log('Opened cache');
-                return cache.addAll(urlsToCache);
-            })
+        (async () => {
+        log("Service Worker: Caching App Shell at the moment......");
+        try {
+            const cache = await caches.open(CACHE_NAME);
+            const resourcesToCache = {
+            html: [
+                "/", 
+                "/addplant",
+                "/error/404_error", 
+                "/error/offline"
+            ],
+            css: ["/css/output.css"],
+            images: [
+                "/images/login.jpg",
+                "/images/logo.jpg",
+                "/images/placeholder.jpg",
+                "/images/noplant.jpg",
+                "/images/addplant.jpg",
+                "/images/offlineimage.png",
+                "/images/chat.jpg"
+            ],
+            javascripts: [
+                '/javascripts/homepage/homepageRenderScript.js',
+                '/javascripts/homepage/homepageScript.js',
+                "/javascripts/addPlant/addPlantScript.js",
+                "/javascripts/addPlant/addPlantIdbUtility.js",
+                "/javascripts/chat/chatScript.js",
+                "/javascripts/chat/chatIdbUtility.js",
+                "/javascripts/chat/chatRenderingScript.js",
+                "/javascripts/user/userScript.js",
+                "/javascripts/user/userRenderScript.js",
+                "/javascripts/user/userIdbUtility.js",
+                "/javascripts/workers/imageWorker.js"
+            ],
+            };
+            const resources = Object.values(resourcesToCache).flat();
+            await cache.addAll(resources);
+        } catch (error) {
+            log("Error occurred while caching: " + error);
+        }
+        })()
     );
 });
 
 // Fetch event - serve from cache, fallback to network
-self.addEventListener('fetch', event => {
-    // Skip caching for API requests and Socket.IO
-    if (event.request.url.includes('/api/') || 
-        event.request.url.includes('/socket.io/') ||
-        event.request.url.includes('check=true')) {
-        // Always go to network for API calls
-        return event.respondWith(fetch(event.request));
-    }
-    
+self.addEventListener("fetch", function (event) {
+    log(event.request.url);
     event.respondWith(
-        caches.match(event.request)
-            .then(response => {
-                // Cache hit - return the response from the cache
-                if (response) {
-                    return response;
-                }
-                // Not in cache - return the result from the live server
-                return fetch(event.request).catch(() => {
-                    // If network fails, return a meaningful error for navigation requests
-                    if (event.request.mode === 'navigate') {
-                        return caches.match('/offline');
-                    }
-                });
-            })
-    );
-});
-
-// Activate event - clean up old caches
-self.addEventListener('activate', event => {
-    const cacheWhitelist = [CACHE_NAME];
-    event.waitUntil(
-        caches.keys().then(cacheNames => {
-            return Promise.all(
-                cacheNames.map(cacheName => {
-                    if (!cacheWhitelist.includes(cacheName)) {
-                        return caches.delete(cacheName);
-                    }
-                })
-            );
+        fetch(event.request)
+        .then((response) => {
+            // Clone the response before caching
+            const responseToCache = response.clone();
+            
+            // Cache the new response for future use
+            caches.open(CACHE_NAME).then((cache) => {
+            cache.put(event.request, responseToCache);
+            });
+            
+            return response;
+        })
+        .catch(() => {
+            return caches.match(event.request).then((response) => {
+            if (response) {
+                return response;
+            }
+            return getOfflinePage().then((response) => {
+                return (
+                response ||
+                get404Page().then(
+                    (response) =>
+                    response ||
+                    new Response(
+                        "You are offline and the requested content is not cached.",
+                        {
+                        status: 404,
+                        statusText: "Not Found",
+                        }
+                    )
+                )
+                );
+            });
+            });
         })
     );
 });
+
+function getOfflinePage() {
+    return caches.match("/error/offline");
+}
+
+function get404Page() {
+    return caches.match("/error/404_error");
+}
