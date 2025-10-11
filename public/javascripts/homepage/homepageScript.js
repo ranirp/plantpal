@@ -56,37 +56,79 @@ async function init() {
 
     // Update queue counter on init (handles offline cached items)
     await updateQueueCounter();
-    // Function to check for offline-synced plants and update them
-    async function checkIfThereIsSyncPlantAndUpdate() {
-        return new Promise(async (resolve, reject) => {
-            let isTherePlantsToSync = false;
-            try {
-                // Open the raw sync DB so we can access numeric keys (id)
-                const db = await openSyncPlantIDB();
-                const syncEntries = await getAllSyncPlants(db);
+    // Function to check for offline-synced plants and update them is defined at top-level
+}    
 
-                // syncEntries are objects from the store and look like { id, value }
-                for (const entry of syncEntries) {
-                    const plant = entry.value || entry;
-                    const localId = entry.id;
+// Function to check for offline-synced plants and update them (top-level so other handlers can call it)
+async function checkIfThereIsSyncPlantAndUpdate() {
+    return new Promise(async (resolve) => {
+        let isTherePlantsToSync = false;
+        try {
+            // Open the raw sync DB so we can access numeric keys (id)
+            const db = await openSyncPlantIDB();
+            const syncEntries = await getAllSyncPlants(db);
 
-                    if (!plant._id) {
-                        if (navigator.onLine) {
-                            // pass the local store id so it can be updated in-place after sync
-                            await addPlantToMongoDB(plant, localId);
-                            isTherePlantsToSync = true;
-                        }
+            // syncEntries are objects from the store and look like { id, value }
+            for (const entry of syncEntries) {
+                const plant = entry.value || entry;
+                const localId = entry.id;
+
+                if (!plant._id) {
+                    if (navigator.onLine) {
+                        // pass the local store id so it can be updated in-place after sync
+                        await addPlantToMongoDB(plant, localId);
+                        isTherePlantsToSync = true;
                     }
                 }
-
-                resolve(isTherePlantsToSync);
-            } catch (error) {
-                console.error("Error checking for sync plants:", error);
-                resolve(false);
             }
-        });
+
+            resolve(isTherePlantsToSync);
+        } catch (error) {
+            console.error("Error checking for sync plants:", error);
+            resolve(false);
+        }
+    });
+}
+
+// Manual sync triggered by the UI sync button
+async function manualSync() {
+    const syncButton = document.getElementById('sync_button');
+    if (!syncButton) {
+        console.warn('Sync button not found');
+        return;
     }
-}    
+
+    try {
+        syncButton.disabled = true;
+        syncButton.classList.add('loading');
+
+        // First, push any locally queued plants to server
+        const didSync = await checkIfThereIsSyncPlantAndUpdate();
+
+        // Then fetch latest plants from network and update UI / cache
+        const networkPlants = await getPlantsFromNetwork();
+        if (networkPlants && networkPlants.length) {
+            // If getPlantsFromNetwork returns data, merge into UI and idb
+            plantLists = networkPlants;
+            applyFilterAndSort();
+            try { await addAllPlantsToIDB(networkPlants); } catch (e) { console.error('addAllPlantsToIDB error:', e); }
+        } else {
+            // Fallback to server full list if the incremental fetch returned nothing
+            try { await getPlantsFromServer(); } catch (e) { console.error('getPlantsFromServer error during manualSync fallback:', e); }
+        }
+
+        // Update queue counter after sync
+        try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
+
+        alert('Sync completed successfully!');
+    } catch (error) {
+        console.error('Sync failed:', error);
+        alert('Sync failed. Please try again.');
+    } finally {
+        syncButton.disabled = false;
+        syncButton.classList.remove('loading');
+    }
+}
 
 // Function to add a plant to MongoDB
 function addPlantToMongoDB(plantDetails, plantId = null) {
