@@ -100,3 +100,34 @@ function getUserName() {
             });
     });
 }
+
+// Persist a lastSync ISO timestamp in the users store using a reserved id key
+function saveLastSync() {
+    return new Promise((resolve, reject) => {
+        initializeUserIDB()
+            .then((db) => {
+                const transaction = db.transaction([USER_STORE_NAME], "readwrite");
+                const store = transaction.objectStore(USER_STORE_NAME);
+                // Use a string key so it does not collide with numeric autoIncrement ids
+                const request = store.put({ id: 'lastSync', value: new Date().toISOString() });
+                request.onsuccess = () => resolve();
+                request.onerror = (e) => reject(e.target.error);
+            })
+            .catch((err) => reject(err));
+    });
+}
+
+// Retrieve the lastSync ISO timestamp (string) or undefined/null if not set
+function getLastSync() {
+    return new Promise((resolve, reject) => {
+        initializeUserIDB()
+            .then((db) => {
+                const transaction = db.transaction([USER_STORE_NAME], 'readonly');
+                const store = transaction.objectStore(USER_STORE_NAME);
+                const request = store.get('lastSync');
+                request.onsuccess = () => resolve(request.result?.value);
+                request.onerror = (e) => reject(e.target.error);
+            })
+            .catch((err) => reject(err));
+    });
+}

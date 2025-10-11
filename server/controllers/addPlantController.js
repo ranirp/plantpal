@@ -108,7 +108,7 @@ exports.addNewPlantToDB = async (req, res, next) => {
  */
 exports.getAllPlants = async (req, res, next) => {
     try {
-        const { sortBy = 'createdAt', order = 'desc' } = req.query;
+        const { sortBy = 'createdAt', order = 'desc', since } = req.query;
 
         let sortOptions = {};
 
@@ -125,7 +125,18 @@ exports.getAllPlants = async (req, res, next) => {
                 break;
         }
 
-        const plants = await AddPlant.find({}).sort(sortOptions);
+        // Build query; if `since` provided, only return plants created after that timestamp
+        const query = {};
+        if (since) {
+            const sinceDate = new Date(since);
+            if (!isNaN(sinceDate.getTime())) {
+                query.createdAt = { $gt: sinceDate };
+            } else {
+                console.warn('Invalid since query param:', since);
+            }
+        }
+
+        const plants = await AddPlant.find(query).sort(sortOptions);
 
         console.log(`Plants retrieved successfully! Count: ${plants.length}`);
 
