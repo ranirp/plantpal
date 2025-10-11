@@ -39,6 +39,23 @@ async function init() {
         // Register the service worker for offline functionality
         navigator.serviceWorker.register("/serviceWorker.js", {
             scope: "/",
+        }).then((registration) => {
+            console.log("Service Worker registered successfully:", registration);
+            
+            // Check for updates
+            registration.addEventListener('updatefound', () => {
+                console.log('Service Worker update found');
+                const newWorker = registration.installing;
+                newWorker.addEventListener('statechange', () => {
+                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                        console.log('New Service Worker installed, reloading page...');
+                        // Optionally reload the page to use the new service worker
+                        // window.location.reload();
+                    }
+                });
+            });
+        }).catch((error) => {
+            console.error("Service Worker registration failed:", error);
         });
     }
 
