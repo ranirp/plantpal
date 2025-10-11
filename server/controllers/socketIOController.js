@@ -25,8 +25,8 @@ exports.init = function (io) {
             });
 
             socket.on('chat', function (message) {
-                console.log('Chat message in room ' + message.plantID + ':', message);
-                io.sockets.to(message.plantID).emit('chatmessage', message);
+                console.log('Chat message in room ' + message.plantId + ':', message);
+                io.sockets.to(message.plantId).emit('chatmessage', message);
             });
 
             socket.on('disconnect', function () {

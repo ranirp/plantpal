@@ -7,40 +7,84 @@ let socket;
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Initializing socket connection...");
     
-    // Initialize socket with connection options
-    socket = io({
-        autoConnect: true,
-        reconnection: true,
-        reconnectionDelay: 1000,
-        reconnectionAttempts: 5,
-        timeout: 20000,
-        forceNew: false
-    });
-    
-    // Socket connection events
-    socket.on('connect', function() {
-        console.log('✅ Socket connected successfully');
-    });
-    
-    socket.on('disconnect', function() {
-        console.log('❌ Socket disconnected');
-    });
-    
-    socket.on('connect_error', function(error) {
-        console.error('❌ Socket connection error:', error);
-    });
-    
-    console.log("Socket.io initialized");
+    // Wait a bit for the page to fully load
+    setTimeout(() => {
+        // Initialize socket with connection options
+        socket = io({
+            autoConnect: true,
+            reconnection: true,
+            reconnectionDelay: 1000,
+            reconnectionAttempts: 10,
+            timeout: 20000,
+            forceNew: false,
+            transports: ['websocket', 'polling'] // Ensure fallback transport
+        });
+        
+        // Socket connection events
+        socket.on('connect', async function() {
+            console.log('✅ Socket connected successfully');
+            // Verify actual server connectivity before updating status
+            const actuallyOnline = await checkServerConnectivity();
+            updateChatStatus(actuallyOnline);
+            // Rejoin room if we have plantId and we're actually online
+            if (actuallyOnline && typeof plantId !== 'undefined' && plantId) {
+                joinPlantChatRoom();
+            }
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('❌ Socket disconnected');
+            updateChatStatus(false);
+        });
+        
+        socket.on('connect_error', function(error) {
+            console.error('❌ Socket connection error:', error);
+        });
+        
+        socket.on('reconnect', function() {
+            console.log('🔄 Socket reconnected');
+            // Rejoin room after reconnection
+            if (typeof plantId !== 'undefined' && plantId) {
+                joinPlantChatRoom();
+            }
+        });
+        
+        console.log("Socket.io initialized");
+    }, 500);
 });
+
+async function updateChatStatus(isOnline) {
+    // If socket says we're online, verify actual server connectivity
+    if (isOnline) {
+        isOnline = await checkServerConnectivity();
+    }
+    
+    const statusDot = document.getElementById('chatStatusDot');
+    const statusText = document.getElementById('chatStatusText');
+    
+    if (isOnline) {
+        statusDot.className = 'w-2 h-2 bg-green-500 rounded-full mr-2';
+        statusText.textContent = 'Online';
+    } else {
+        statusDot.className = 'w-2 h-2 bg-red-500 rounded-full mr-2';
+        statusText.textContent = 'Offline';
+    }
+    
+    // Also update the general online/offline status
+    changeOnlineStatus(isOnline);
+}
 
 const urlParams = new URLSearchParams(window.location.search);
 var chatMessages = [];
 
 function init() {
+    console.log("Initializing chat...");
+    
     // Make sure socket is initialized
     if (!socket) {
-        socket = io();
-        console.log("Socket.io initialized in init()");
+        console.log("Socket not initialized yet, waiting...");
+        setTimeout(init, 500);
+        return;
     }
     
     // Check if plantId exists
@@ -54,11 +98,29 @@ function init() {
         }
     }
     
-    joinPlantChatRoom();
+    // Check if loggedInUser exists
+    if (typeof loggedInUser === 'undefined' || !loggedInUser) {
+        console.error("loggedInUser is not defined in init()");
+        // Try to get from DOM or set default
+        loggedInUser = "Guest";
+    }
+    
+    console.log("Chat initialized with plantId:", plantId, "user:", loggedInUser);
+    
     getChatHistory(plantId);
     registerSocket();
     registerFormSubmit();
     listenForOnlineSync();
+    
+    // Join room after socket is connected
+    if (socket && socket.connected) {
+        joinPlantChatRoom();
+    } else {
+        // Wait for socket to connect
+        socket.on('connect', function() {
+            joinPlantChatRoom();
+        });
+    }
 }
 
 // Function to check actual server connectivity
@@ -72,9 +134,9 @@ async function checkServerConnectivity() {
         // Use a timestamp to prevent caching
         const timestamp = new Date().getTime();
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 seconds timeout
+        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5 seconds
         
-        // First try a direct chat-specific endpoint
+        // Try the chat ping endpoint first
         const chatCheckEndpoint = `/api/chat/ping?_=${timestamp}`;
         console.log(`🔄 Testing chat connectivity with: ${chatCheckEndpoint}`);
         
@@ -91,31 +153,31 @@ async function checkServerConnectivity() {
                 signal: controller.signal
             });
             
+            clearTimeout(timeoutId);
             if (chatResponse.ok) {
                 console.log('✅ Chat API is responsive');
-                clearTimeout(timeoutId);
                 return true;
             }
         } catch (chatError) {
             console.log('Chat endpoint check failed, trying fallback:', chatError.message);
         }
         
-        // Fallback to general API check
-        const response = await fetch(`/api/plants/getAllPlants?check=true&_=${timestamp}`, {
+        // Fallback to simple route check
+        const timeoutId2 = setTimeout(() => controller.abort(), 3000);
+        const response = await fetch(`/?check=true&_=${timestamp}`, {
             method: "GET",
             cache: "no-cache",
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
-                'Expires': '0',
-                'X-Requested-With': 'XMLHttpRequest'
+                'Expires': '0'
             },
             signal: controller.signal
         });
         
-        clearTimeout(timeoutId);
+        clearTimeout(timeoutId2);
         console.log(`📶 Server responded with status: ${response.status}`);
-        return response.ok;
+        return response.ok || response.status === 304; // Accept 304 Not Modified as success
     } catch (error) {
         console.log('📡 Server connectivity check failed:', error.message);
         return false;
@@ -127,15 +189,15 @@ function listenForOnlineSync() {
     console.log("🔍 Checking initial connectivity for chat...");
     checkServerConnectivity().then(isOnline => {
         console.log(`Chat connectivity check: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
-        changeOnlineStatus(isOnline);
+        updateChatStatus(isOnline);
     });
 
     window.addEventListener('online', async function () {
         console.log("🌐 Navigator reports online, checking server connectivity...");
         // Add a small delay to let network stabilize
-        await new Promise(resolve => setTimeout(resolve, 500));
+        await new Promise(resolve => setTimeout(resolve, 1500));
         const actuallyOnline = await checkServerConnectivity();
-        changeOnlineStatus(actuallyOnline);
+        updateChatStatus(actuallyOnline);
         
         if (actuallyOnline) {
             console.log("✅ You are online now - syncing offline chat messages");
@@ -161,20 +223,22 @@ function listenForOnlineSync() {
     });
 
     window.addEventListener('offline', function () {
-        changeOnlineStatus(false);
+        updateChatStatus(false);
         console.log("❌ You are offline now");
     });
     
-    // More aggressive periodic check every 10 seconds
+    // Periodic check every 15 seconds (more responsive)
     setInterval(async () => {
-        const actuallyOnline = await checkServerConnectivity();
-        const currentStatus = document.getElementById('onlineText')?.innerHTML === 'Online';
-        // Only update if status changed
-        if (actuallyOnline !== currentStatus) {
-            console.log(`🔄 Chat status changed: ${currentStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
-            changeOnlineStatus(actuallyOnline);
+        if (navigator.onLine) {  // Only check server if browser reports online
+            const actuallyOnline = await checkServerConnectivity();
+            const currentStatus = document.getElementById('chatStatusText')?.textContent === 'Online';
+            // Only update if status changed
+            if (actuallyOnline !== currentStatus) {
+                console.log(`🔄 Chat status changed: ${currentStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
+                updateChatStatus(actuallyOnline);
+            }
         }
-    }, 10000); // Check every 10 seconds
+    }, 15000); // Check every 15 seconds
 }
 
 function changeOnlineStatus(isOnline) {
@@ -264,7 +328,7 @@ async function sendMessage(isSuggestingName = false) {
             });
         } else {
             // Not user's plant - cannot chat offline
-            alert("You can only send messages to your own plants when offline.\n\nWhen offline, you can:\n✅ Message plants you created\n❌ Not message other users' plants\n\nPlease connect to internet to chat with all plants.");
+            alert("You can only send messages to your own plants when offline \n\nPlease connect to internet to chat with all plants");
             return;
         }
     }
@@ -283,18 +347,65 @@ async function isUserOwnPlant(plantId, username) {
         }
         
         // Fallback: check from IndexedDB
-        const db = await openSyncPlantIDB();
-        const plants = await getAllSyncPlants(db);
-        const plant = plants.find(p => {
-            const plantData = p.value || p;
-            return (plantData._id === plantId || p.id === plantId) && plantData.nickname === username;
-        });
-        
-        return !!plant;
+        try {
+            const db = await openSyncPlantIDB();
+            const plants = await getAllSyncPlants(db);
+            const plant = plants.find(p => {
+                const plantData = p.value || p;
+                return (plantData._id === plantId || p.id === plantId) && plantData.nickname === username;
+            });
+            
+            return !!plant;
+        } catch (idbError) {
+            console.log('IndexedDB fallback failed:', idbError);
+            return false;
+        }
     } catch (error) {
         console.error("Error checking plant ownership:", error);
         return false; // Default to not allowing offline chat if we can't verify
     }
+}
+
+// Placeholder functions for plant IndexedDB operations
+async function openSyncPlantIDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('plants', 1);
+        
+        request.onerror = function (event) {
+            reject(new Error(`Database error: ${event.target}`));
+        };
+        
+        request.onupgradeneeded = function (event) {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('plants')) {
+                db.createObjectStore('plants', {
+                    keyPath: 'id',
+                    autoIncrement: true,
+                });
+            }
+        };
+        
+        request.onsuccess = function (event) {
+            const db = event.target.result;
+            resolve(db);
+        };
+    });
+}
+
+async function getAllSyncPlants(db) {
+    return new Promise((resolve, reject) => {
+        const transaction = db.transaction(['plants'], 'readonly');
+        const store = transaction.objectStore('plants');
+        const request = store.getAll();
+        
+        request.onsuccess = function() {
+            resolve(request.result || []);
+        };
+        
+        request.onerror = function() {
+            reject(request.error);
+        };
+    });
 }
 
 function registerSocket() {
@@ -311,8 +422,11 @@ function registerSocket() {
     });
 
     socket.on("chatmessage", function (message) {
-        console.log("Received chat message:", message);
-        renderChatMessages([message]);
+        console.log("Received chat message via socket:", message);
+        console.log("Message properties:", Object.keys(message));
+        console.log("Message content property 'chatmessage':", message.chatmessage);
+        console.log("Message content property 'chatMessage':", message.chatMessage);
+        renderChatMessage([message]); // Use single message render function
     });
 }
 
@@ -342,8 +456,8 @@ function addChatToDB(message) {
     .then(data => {
         if (data.success) {
             console.log('✅ Chat message saved to database:', data);
-            // Immediately render the message in the UI
-            renderChatMessages([message]);
+            // Don't render here - let socket handle it to avoid duplicates
+            // The socket will emit back the message to all connected clients
         } else {
             console.error('❌ Failed to save chat message:', data);
         }
@@ -359,8 +473,24 @@ function joinPlantChatRoom() {
         console.error('plantId is not defined');
         return;
     }
+    
+    if (!socket || !socket.connected) {
+        console.log('Socket not connected, waiting...');
+        // Wait for socket to connect
+        if (socket) {
+            socket.on('connect', function() {
+                console.log('Socket connected, now joining room');
+                var roomNo = plantId;
+                var name = loggedInUser;
+                socket.emit("createorjoin", roomNo, name);
+            });
+        }
+        return;
+    }
+    
     var roomNo = plantId;
     var name = loggedInUser;
+    console.log(`Joining room ${roomNo} as ${name}`);
     socket.emit("createorjoin", roomNo, name);
 }
 
@@ -401,9 +531,53 @@ function getChatHistory(plantId) {
         });
 }
 
+function renderChatMessage(messages) {
+    // Function to render new messages without clearing existing ones
+    try {
+        const chatContainer = document.getElementById("chatMessages");
+        if (!chatContainer) {
+            console.error("Chat container not found!");
+            return;
+        }
+
+        console.log("Rendering new chat message:", messages);
+        console.log("Number of messages to render:", messages.length);
+
+        // Remove no messages div if present
+        const noMessagesDiv = document.getElementById("noMessagesDiv");
+        if (noMessagesDiv) {
+            chatContainer.removeChild(noMessagesDiv);
+        }
+
+        messages.forEach((message, index) => {
+            console.log(`Processing message ${index}:`, message);
+            // Handle both chattime and chatTime formats
+            let chatTime = new Date(message.chattime || message.chatTime);
+            let formattedChatTime = chatTime.toLocaleString("en-US", {
+                month: "long",
+                day: "numeric", 
+                year: "numeric",
+                hour: "numeric",
+                minute: "numeric",
+                hour12: true,
+            });
+            message.chatTime = formattedChatTime;
+            console.log("About to create chat message div for:", message);
+            const chatMessageDiv = createChatMessageDiv(message);
+            console.log("Created chat message div:", chatMessageDiv);
+            chatContainer.appendChild(chatMessageDiv);
+        });
+
+        // Scroll to the bottom of the chat container
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    } catch (error) {
+        console.error("Error rendering chat message:", error.message);
+    }
+}
+
 function renderChatMessages(messages) {
     try {
-        const chatContainer = document.getElementById("chatmessages");
+        const chatContainer = document.getElementById("chatMessages");
         if (!chatContainer) {
             console.error("Chat container not found!");
             return;
@@ -434,13 +608,16 @@ function renderChatMessages(messages) {
             noMessagesImg.classList.add("w-80");
 
             const noMessagesText = document.createElement("div");
-            noMessagesText.classList.add("text-lg", "text-gray-500");
-            noMessagesText.textContent = "No messages yet. Start the conversation!";
-
+            noMessagesText.classList.add("text-lg", "text-gray-500", "text-center");
+            noMessagesText.innerHTML = "No messages yet <br> Start the conversation!";
+            
             noMessagesDiv.appendChild(noMessagesImg);
             noMessagesDiv.appendChild(noMessagesText);
             chatContainer.appendChild(noMessagesDiv);
         } else {
+            // Clear the chat container first to prevent duplicate messages
+            chatContainer.innerHTML = '';
+            
             messages.forEach((message) => {
                 // Handle both chattime and chatTime formats
                 let chatTime = new Date(message.chattime || message.chatTime);
