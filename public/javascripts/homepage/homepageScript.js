@@ -61,20 +61,28 @@ async function init() {
         return new Promise(async (resolve, reject) => {
             let isTherePlantsToSync = false;
             try {
-                const plantDB = await getPlantsFromIDB();
-                plants.forEach((plant) => {
-                    // Check if plants are offline-synced 
+                // Open the raw sync DB so we can access numeric keys (id)
+                const db = await openSyncPlantIDB();
+                const syncEntries = await getAllSyncPlants(db);
+
+                // syncEntries are objects from the store and look like { id, value }
+                for (const entry of syncEntries) {
+                    const plant = entry.value || entry;
+                    const localId = entry.id;
+
                     if (!plant._id) {
                         if (navigator.onLine) {
-                            addPlantToMongoDB(plant);
+                            // pass the local store id so it can be updated in-place after sync
+                            await addPlantToMongoDB(plant, localId);
                             isTherePlantsToSync = true;
                         }
                     }
-                });
+                }
+
                 resolve(isTherePlantsToSync);
             } catch (error) {
                 console.error("Error checking for sync plants:", error);
-                resolve(error); 
+                resolve(false);
             }
         });
     }
@@ -83,72 +91,86 @@ async function init() {
 // Function to add a plant to MongoDB
 function addPlantToMongoDB(plantDetails, plantId = null) {
     console.log("Syncing plant to server:", plantDetails);
-    
+
     return new Promise((resolve, reject) => {
         const formData = new FormData();
         formData.append("plantName", plantDetails.plantName);
         formData.append("type", plantDetails.type);
         formData.append("description", plantDetails.description);
         formData.append("nickname", plantDetails.nickname);
-        
-        // Handle photo - if it's offline metadata, don't include the photo
+
         if (plantDetails.photo && plantDetails.photo instanceof File) {
             formData.append("photo", plantDetails.photo);
         } else if (plantDetails.photo && typeof plantDetails.photo === 'object' && plantDetails.photo.name) {
-            // This is offline photo metadata, we can't sync the actual file
             console.log("Offline plant has photo metadata but actual file not available for sync:", plantDetails.photo);
-            // Don't append photo to formData - the plant will be saved without photo
         } else if (typeof plantDetails.photo === 'string') {
-            // This shouldn't happen in sync, but handle just in case
             formData.append("photo", plantDetails.photo);
         }
 
-        // POST request to add new plant to server
         fetch("/api/plants/addNewPlant", {
             method: "POST",
             body: formData
         })
         .then(async response => {
-            if (response.ok) {
-                console.log("Synced plant to server successfully");
-                
-                // Instead of deleting, mark the plant as synced and get the server response
-                if (plantId) {
-                    try {
-                        const responseData = await response.json();
-                        const serverId = responseData._id || responseData.id;
-                        
-                        if (serverId) {
-                            // Update the plant in IndexedDB with server ID and sync status
-                            const db = await openSyncPlantIDB();
-                            const updatedPlant = {
-                                ...plantDetails,
-                                _id: serverId,
-                                __isServerPlant: true,
-                                __syncStatus: 'synced',
-                                __lastSyncTime: Date.now()
-                            };
-                            
-                            // Delete the old offline entry and add the synced version
-                            await deleteSyncPlantFromIDB(db, plantId);
-                            await addNewPlantToSync(db, updatedPlant);
-                            console.log("Successfully updated plant sync status in IndexedDB");
-                            // After marking plant as synced, refresh the queue counter
-                            try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
+            if (!response.ok) {
+                console.error("Error syncing plant to server, status:", response.status);
+                reject(new Error(`Server error: ${response.status}`));
+                return;
+            }
+
+            let responseData = null;
+            try { responseData = await response.json(); } catch (e) { /* ignore parse errors */ }
+            const serverId = responseData && (responseData._id || responseData.id) ? (responseData._id || responseData.id) : null;
+            console.log("Synced plant to server successfully, serverId:", serverId);
+
+            if (plantId) {
+                try {
+                    const db = await openSyncPlantIDB();
+                    const transaction = db.transaction(['plants'], 'readwrite');
+                    const store = transaction.objectStore('plants');
+                    const getReq = store.get(plantId);
+
+                    getReq.addEventListener('success', async () => {
+                        const record = getReq.result;
+                        if (!record) {
+                            console.warn('Local sync record not found for id', plantId);
+                            resolve();
+                            return;
                         }
-                        
+
+                        const existingPlant = record.value || record;
+                        const updatedValue = {
+                            ...existingPlant,
+                            _id: serverId || existingPlant._id,
+                            __isServerPlant: true,
+                            __syncStatus: serverId ? 'synced' : 'pending',
+                            __lastSyncTime: Date.now()
+                        };
+
+                        const putReq = store.put({ id: plantId, value: updatedValue });
+                        putReq.addEventListener('success', async () => {
+                            console.log('Updated local IndexedDB record with server _id for id', plantId);
+                            try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
+                            resolve();
+                        });
+
+                        putReq.addEventListener('error', (ev) => {
+                            console.error('Error updating local record after sync:', ev.target.error);
+                            resolve();
+                        });
+                    });
+
+                    getReq.addEventListener('error', (ev) => {
+                        console.error('Error reading local record before updating:', ev.target.error);
                         resolve();
-                    } catch (error) {
-                        console.error("Error updating plant sync status:", error);
-                        resolve(); // Still resolve to continue with other operations
-                    }
-                } else {
-                    console.log("No plantId provided, skipping IndexedDB update");
+                    });
+                } catch (error) {
+                    console.error("Error updating plant sync status in IndexedDB:", error);
                     resolve();
                 }
             } else {
-                console.error("Error syncing plant to server, status:", response.status);
-                reject(new Error(`Server error: ${response.status}`));
+                console.log("No local plantId provided, skipping IndexedDB update");
+                resolve();
             }
         })
         .catch(error => {
