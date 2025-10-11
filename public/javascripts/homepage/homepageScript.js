@@ -32,7 +32,12 @@ function openAddPlantPage() {
 
 // Function to initialize the application
 async function init() {
-    console.log("🚀 Init function called");
+    console.log("═══════════════════════════════════════════");
+    console.log("🚀 INIT FUNCTION CALLED - STARTING APP");
+    console.log("📍 Current URL:", window.location.href);
+    console.log("🌐 Navigator online:", navigator.onLine);
+    console.log("═══════════════════════════════════════════");
+    
     checkIfUserLoggedIn(); // Check if user is logged in
 
     if ("serviceWorker" in navigator) {
@@ -59,16 +64,37 @@ async function init() {
         });
     }
 
+    // Setup sync event listener first, before any sync operations
+    listenForOnlineSync();
+    
+    // Then proceed with initial sync/fetch based on network status
     if (navigator.onLine) {
-        // Check if there are any plants that need to be synced and update them
-        const isTherePlantsToSync = await checkIfThereIsSyncPlantAndUpdate();
-        if (isTherePlantsToSync) {
-            getPlantsFromServer(); // Fetch latest plants from server after sync
+        console.log("🌐 Online mode detected at init - checking for server connectivity");
+        // Verify actual server connectivity before proceeding
+        if (typeof checkServerConnectivity === 'function') {
+            const isActuallyOnline = await checkServerConnectivity();
+            if (isActuallyOnline) {
+                console.log("🌐 Server connectivity confirmed - proceeding with online init");
+                // ALWAYS sync pending plants first if any exist
+                await checkIfThereIsSyncPlantAndUpdate();
+                
+                // ALWAYS fetch fresh data from server when online
+                // This ensures the UI shows the latest plants, not stale cache
+                getPlantsFromServer();
+            } else {
+                console.log("⚠️ No server connectivity despite navigator.onLine=true - using offline mode");
+                getPlantsFromIDB();
+            }
         } else {
-            getPlantsFromIDB(); // No sync needed, fetch from IndexedDB
+            // No connectivity check available; attempt online flow
+            console.log("⚠️ No connectivity check function available - proceeding with online init");
+            await checkIfThereIsSyncPlantAndUpdate();
+            getPlantsFromServer();
         }
-
-        listenForOnlineSync(); // Listen for online event to sync plants
+    } else {
+        console.log("📴 Offline mode detected at init - using local data");
+        // Only use IndexedDB cache when truly offline
+        getPlantsFromIDB();
     }
 
     // Update queue counter on init (handles offline cached items)
@@ -78,6 +104,9 @@ async function init() {
 
 // Function to check for offline-synced plants and update them (top-level so other handlers can call it)
 async function checkIfThereIsSyncPlantAndUpdate() {
+    console.log("═══════════════════════════════════════════");
+    console.log(`🔄 SYNC CHECK STARTED - ${new Date().toISOString()}`);
+    
     return new Promise(async (resolve) => {
         let isTherePlantsToSync = false;
         try {
@@ -85,71 +114,51 @@ async function checkIfThereIsSyncPlantAndUpdate() {
             const db = await openSyncPlantIDB();
             const syncEntries = await getAllSyncPlants(db);
 
+            console.log(`📦 Found ${syncEntries.length} total items in IndexedDB`);
+
             // syncEntries are objects from the store and look like { id, value }
             for (const entry of syncEntries) {
                 const plant = entry.value || entry;
                 const localId = entry.id;
 
-                if (!plant._id) {
-                    if (navigator.onLine) {
-                        // pass the local store id so it can be updated in-place after sync
-                        await addPlantToMongoDB(plant, localId);
-                        isTherePlantsToSync = true;
-                    }
+                // Only sync if:
+                // 1. Plant doesn't have a server _id OR has an offline temp ID
+                // 2. Plant is not already synced (__syncStatus !== 'synced')
+                // 3. Plant is not from server (__isServerPlant !== true)
+                // 4. We're online
+                const needsSync = (!plant._id || (typeof plant._id === 'string' && plant._id.startsWith('offline_'))) 
+                                    && plant.__syncStatus !== 'synced' 
+                                    && !plant.__isServerPlant;
+                
+                if (needsSync && navigator.onLine) {
+                    console.log(`📤 Syncing plant ${localId}: ${plant.plantName}`);
+                    // pass the local store id so it can be updated in-place after sync
+                    await addPlantToMongoDB(plant, localId);
+                    isTherePlantsToSync = true;
+                } else {
+                    const reason = plant.__isServerPlant ? 'server plant (cached)' : 
+                                    plant.__syncStatus === 'synced' ? 'already synced' : 'unknown';
+                    console.log(`⏭️  Skipping plant ${localId} (${plant.plantName}): ${reason}`);
                 }
             }
 
+            console.log(`✅ Sync check complete. Plants synced: ${isTherePlantsToSync}`);
+            console.log("═══════════════════════════════════════════");
             resolve(isTherePlantsToSync);
         } catch (error) {
-            console.error("Error checking for sync plants:", error);
+            console.error("❌ Error checking for sync plants:", error);
+            console.log("═══════════════════════════════════════════");
             resolve(false);
         }
     });
 }
 
-// Manual sync triggered by the UI sync button
-async function manualSync() {
-    const syncButton = document.getElementById('sync_button');
-    if (!syncButton) {
-        console.warn('Sync button not found');
-        return;
-    }
-
-    try {
-        syncButton.disabled = true;
-        syncButton.classList.add('loading');
-
-        // First, push any locally queued plants to server
-        const didSync = await checkIfThereIsSyncPlantAndUpdate();
-
-        // Then fetch latest plants from network and update UI / cache
-        const networkPlants = await getPlantsFromNetwork();
-        if (networkPlants && networkPlants.length) {
-            // If getPlantsFromNetwork returns data, merge into UI and idb
-            plantLists = networkPlants;
-            applyFilterAndSort();
-            try { await addAllPlantsToIDB(networkPlants); } catch (e) { console.error('addAllPlantsToIDB error:', e); }
-        } else {
-            // Fallback to server full list if the incremental fetch returned nothing
-            try { await getPlantsFromServer(); } catch (e) { console.error('getPlantsFromServer error during manualSync fallback:', e); }
-        }
-
-        // Update queue counter after sync
-        try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
-
-        alert('Sync completed successfully!');
-    } catch (error) {
-        console.error('Sync failed:', error);
-        alert('Sync failed. Please try again.');
-    } finally {
-        syncButton.disabled = false;
-        syncButton.classList.remove('loading');
-    }
-}
+// Automatic background sync - no manual button needed
+// Sync happens automatically when coming online or on page load
 
 // Function to add a plant to MongoDB
 function addPlantToMongoDB(plantDetails, plantId = null) {
-    console.log("Syncing plant to server:", plantDetails);
+    console.log("📤 Syncing plant to server:", plantDetails.plantName);
 
     return new Promise((resolve, reject) => {
         const formData = new FormData();
@@ -158,12 +167,18 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
         formData.append("description", plantDetails.description);
         formData.append("nickname", plantDetails.nickname);
 
-        if (plantDetails.photo && plantDetails.photo instanceof File) {
-            formData.append("photo", plantDetails.photo);
-        } else if (plantDetails.photo && typeof plantDetails.photo === 'object' && plantDetails.photo.name) {
-            console.log("Offline plant has photo metadata but actual file not available for sync:", plantDetails.photo);
-        } else if (typeof plantDetails.photo === 'string') {
-            formData.append("photo", plantDetails.photo);
+        // Handle photo upload - check if it's a File object (from offline storage) or Blob
+        if (plantDetails.photo) {
+            if (plantDetails.photo instanceof File || plantDetails.photo instanceof Blob) {
+                console.log("📷 Uploading photo with plant:", plantDetails.photo.name || 'blob');
+                formData.append("photo", plantDetails.photo);
+            } else if (typeof plantDetails.photo === 'string') {
+                // Photo is already uploaded (string filename)
+                formData.append("photo", plantDetails.photo);
+            } else if (typeof plantDetails.photo === 'object' && plantDetails.photo.name) {
+                // Metadata only - file was lost (shouldn't happen with new approach)
+                console.warn("⚠️  Photo metadata found but no actual file. Photo will not be uploaded:", plantDetails.photo.name);
+            }
         }
 
         fetch("/api/plants/addNewPlant", {
@@ -172,15 +187,25 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
         })
         .then(async response => {
             if (!response.ok) {
-                console.error("Error syncing plant to server, status:", response.status);
+                console.error("❌ Error syncing plant to server, status:", response.status);
                 reject(new Error(`Server error: ${response.status}`));
                 return;
             }
 
             let responseData = null;
             try { responseData = await response.json(); } catch (e) { /* ignore parse errors */ }
-            const serverId = responseData && (responseData._id || responseData.id) ? (responseData._id || responseData.id) : null;
-            console.log("Synced plant to server successfully, serverId:", serverId);
+            
+            // Debug: Log the full response structure
+            console.log("📋 Server response structure:", {
+                responseData: responseData,
+                hasPlant: !!(responseData && responseData.plant),
+                plantId: responseData && responseData.plant ? responseData.plant._id : 'not found',
+                fullPlantData: responseData && responseData.plant ? responseData.plant : 'no plant in response'
+            });
+            
+            const serverId = responseData && responseData.plant && responseData.plant._id ? responseData.plant._id : 
+                             responseData && (responseData._id || responseData.id) ? (responseData._id || responseData.id) : null;
+            console.log("✅ Synced plant to server successfully, serverId:", serverId);
 
             if (plantId) {
                 try {
@@ -198,25 +223,47 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                         }
 
                         const existingPlant = record.value || record;
-                        const updatedValue = {
-                            ...existingPlant,
-                            _id: serverId || existingPlant._id,
-                            __isServerPlant: true,
-                            __syncStatus: serverId ? 'synced' : 'pending',
-                            __lastSyncTime: Date.now()
-                        };
+                        // If successfully synced, REMOVE from sync queue completely
+                        // The plant will be fetched fresh from server and cached separately
+                        if (serverId) {
+                            const deleteReq = store.delete(plantId);
+                            deleteReq.addEventListener('success', async () => {
+                                console.log('✅ Removed synced plant from offline queue:', plantId);
+                                console.log('🔄 Plant will be fetched fresh from server and cached');
+                                try { 
+                                    await updateQueueCounter(); 
+                                } catch (e) { 
+                                    console.error('updateQueueCounter error:', e); 
+                                }
+                                resolve();
+                            });
+                            deleteReq.addEventListener('error', (ev) => {
+                                console.error('❌ Error deleting synced plant from queue:', ev.target.error);
+                                // Still resolve - sync was successful
+                                resolve();
+                            });
+                        } else {
+                            // No server ID returned, keep it as pending for retry
+                            const updatedValue = {
+                                ...existingPlant,
+                                _id: existingPlant._id,
+                                __isServerPlant: false,
+                                __syncStatus: 'pending',
+                                __lastSyncTime: Date.now()
+                            };
 
-                        const putReq = store.put({ id: plantId, value: updatedValue });
-                        putReq.addEventListener('success', async () => {
-                            console.log('Updated local IndexedDB record with server _id for id', plantId);
-                            try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
-                            resolve();
-                        });
+                            const putReq = store.put({ id: plantId, value: updatedValue });
+                            putReq.addEventListener('success', async () => {
+                                console.log('⚠️  Sync attempted but no server ID returned for plant:', plantId);
+                                try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
+                                resolve();
+                            });
 
-                        putReq.addEventListener('error', (ev) => {
-                            console.error('Error updating local record after sync:', ev.target.error);
-                            resolve();
-                        });
+                            putReq.addEventListener('error', (ev) => {
+                                console.error('❌ Error updating local record after sync:', ev.target.error);
+                                resolve();
+                            });
+                        }
                     });
 
                     getReq.addEventListener('error', (ev) => {
@@ -242,22 +289,37 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
 // Function to fetch plants from server
 async function getPlantsFromServer() {
     try {
-        console.log("Fetching plants from server...");
-        const response = await fetch("/api/plants/getAllPlants?sortBy=createdAt&order=desc");
+        console.log("═══════════════════════════════════════════");
+        console.log("🌐 FETCHING FRESH DATA FROM SERVER (ONLINE MODE)");
+        console.log("═══════════════════════════════════════════");
+        // Add cache-busting parameter to ensure fresh data
+        const cacheBuster = Date.now();
+        const response = await fetch(`/api/plants/getAllPlants?sortBy=createdAt&order=desc&_=${cacheBuster}`, {
+            cache: 'no-store' // Prevent browser HTTP caching
+        });
+        console.log("📡 Server response status:", response.status, response.ok);
+        
         if (response.ok) {
             const data = await response.json();
             plantLists = data.plants || data; // Handle both array and object responses
-            console.log("Plants fetched from server:", plantLists);
-            console.log("Number of plants:", plantLists.length);
-            applyFilterAndSort(); // Apply current filter and sort
-            addAllPlantsToIDB(plantLists); // Update IndexedDB with latest plants
+            console.log("✅ Plants fetched from server successfully!");
+            console.log("📊 Number of plants received:", plantLists.length);
+            console.log("🌱 Plants data:", plantLists);
+            
+            // CRITICAL: Render immediately so user sees data
+            applyFilterAndSort();
+            
+            // Cache in background (don't block UI)
+            addAllPlantsToIDB(plantLists);
         } else {
-            console.error("Failed to fetch plants. Status:", response.status);
+            console.error("❌ Failed to fetch plants. Status:", response.status);
             throw new Error("Failed to fetch plants from server");
         }
     } catch (error) {
-        console.error("Error fetching plants from server:", error.message);
-        renderPlantList([]); // Render empty list on error
+        console.error("❌ Error fetching plants from server:", error.message);
+        // Try to load from cache as fallback
+        console.log("📦 Attempting to load from IndexedDB cache as fallback...");
+        await getPlantsFromIDB();
     }
 }
 
@@ -304,11 +366,13 @@ if (typeof module !== 'undefined' && module.exports) {
 
 // Function to fetch plants from IndexedDB
 async function getPlantsFromIDB() {
-    console.log("Fetching plants from IndexedDB...");
+    console.log("═══════════════════════════════════════════");
+    console.log("📦 LOADING FROM INDEXEDDB CACHE (OFFLINE MODE)");
+    console.log("═══════════════════════════════════════════");
     try {
         plantLists = await getAllPlantsFromIDB();
-        console.log("Plants from IndexedDB:", plantLists);
-        console.log("Plant types in IndexedDB:", plantLists.map(p => ({
+        console.log("📦 Plants loaded from IndexedDB:", plantLists.length);
+        console.log("🔍 Plant types in IndexedDB:", plantLists.map(p => ({
             name: p.plantName,
             hasId: !!p._id,
             isServerPlant: !!p.__isServerPlant,
@@ -316,7 +380,7 @@ async function getPlantsFromIDB() {
         })));
         applyFilterAndSort(); // Apply current filter and sort
     } catch (error) {
-        console.error("Error fetching plants from IndexedDB:", error);
+        console.error("❌ Error fetching plants from IndexedDB:", error);
         plantLists = [];
         applyFilterAndSort();
     }
@@ -324,23 +388,37 @@ async function getPlantsFromIDB() {
 
 // Function to add all plants to IndexedDB (PWA caching approach)
 async function addAllPlantsToIDB(plants) {
-    console.log("Updating IndexedDB cache with server plants:", plants.length, "plants");
+    console.log("📦 Updating IndexedDB cache with server plants:", plants.length, "plants");
+    console.log("⚠️ NOTE: This is BACKGROUND caching only - UI already shows fresh server data");
     try {
         const db = await openSyncPlantIDB();
         
-        // Instead of clearing all data, we'll merge server data with local cache
-        console.log("Merging server plants with local IndexedDB cache...");
+        // Smart merge: Update server plants in cache, keep pending offline plants separate
+        console.log("🔄 Merging server plants with local IndexedDB cache...");
         
-        // Get existing plants to avoid duplicates
+        // Get existing plants
         const existingPlants = await getAllSyncPlants(db);
-        const existingServerPlantIds = new Set(
-            existingPlants
-                .filter(item => (item.value || item).__isServerPlant && (item.value || item)._id)
-                .map(item => (item.value || item)._id)
-        );
+        
+        // Build a map of existing server plants by _id for quick lookup
+        const existingServerPlantsMap = new Map();
+        const pendingPlants = [];
+        
+        existingPlants.forEach(item => {
+            const plant = item.value || item;
+            if (plant.__isServerPlant && plant._id) {
+                existingServerPlantsMap.set(plant._id, item.id); // Map server ID to local store ID
+            } else if (plant.__syncStatus === 'pending') {
+                pendingPlants.push(plant);
+            }
+        });
+        
+        console.log(`📊 Cache state: ${existingServerPlantsMap.size} server plants, ${pendingPlants.length} pending sync`);
         
         // Add or update server plants
-        const addPromises = plants.map((plant) => {
+        const transaction = db.transaction(['plants'], 'readwrite');
+        const store = transaction.objectStore('plants');
+        
+        for (const plant of plants) {
             const serverPlant = { 
                 ...plant, 
                 __isServerPlant: true,
@@ -348,28 +426,39 @@ async function addAllPlantsToIDB(plants) {
                 __lastSyncTime: Date.now()
             };
             
-            // If plant already exists in cache, we might want to update it
-            return addNewPlantToSync(db, serverPlant);
+            // Check if we already have this server plant cached
+            if (existingServerPlantsMap.has(plant._id)) {
+                // Update existing cache entry
+                const localId = existingServerPlantsMap.get(plant._id);
+                store.put({ id: localId, value: serverPlant });
+            } else {
+                // Add new server plant to cache
+                store.add({ value: serverPlant });
+            }
+        }
+        
+        // Wait for transaction to complete
+        await new Promise((resolve, reject) => {
+            transaction.oncomplete = resolve;
+            transaction.onerror = () => reject(transaction.error);
         });
         
-        await Promise.all(addPromises);
-        console.log(`Successfully cached ${plants.length} server plants to IndexedDB`);
+        console.log(`✅ Successfully cached ${plants.length} server plants to IndexedDB`);
         
         // Log cache statistics
         const updatedPlants = await getAllSyncPlants(db);
         const cacheStats = {
             total: updatedPlants.length,
             serverPlants: updatedPlants.filter(item => (item.value || item).__isServerPlant).length,
-            offlinePlants: updatedPlants.filter(item => !(item.value || item).__isServerPlant && !(item.value || item)._id).length,
-            syncedPlants: updatedPlants.filter(item => (item.value || item).__syncStatus === 'synced').length,
-            pendingSync: updatedPlants.filter(item => (item.value || item).__syncStatus === 'pending').length
+            pendingSync: updatedPlants.filter(item => (item.value || item).__syncStatus === 'pending' && !(item.value || item).__isServerPlant).length
         };
-    console.log("IndexedDB Cache Statistics:", cacheStats);
-    // Refresh queue counter after updating cache
-    try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
+        console.log("📊 IndexedDB Cache Statistics:", cacheStats);
+        
+        // Refresh queue counter after updating cache
+        try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
         
     } catch (error) {
-        console.error("Error updating IndexedDB cache:", error);
+        console.error("❌ Error updating IndexedDB cache:", error);
     }
 }
 
@@ -454,22 +543,30 @@ function applyFilterAndSort() {
     renderPlantList(filteredPlants); // Render the filtered and sorted list
 }
 
-// Function to listen for online event to sync plants
+// Function to listen for online event and sync data
 function listenForOnlineSync() {
-    window.addEventListener('online', async () => {
-        console.log("Navigator reports online, checking server connectivity...");
-        const actuallyOnline = await checkServerConnectivity();
+    // Use a debounced version to prevent multiple rapid executions
+    let syncTimeout = null;
+    
+    window.addEventListener("online", async() => {
+        console.log("ONLINE EVENT DETECTED - Starting sync process");
         
-        if (actuallyOnline) {
-            console.log("Device came online, syncing plants...");
-            const isTherePlantsToSync = await checkIfThereIsSyncPlantAndUpdate();
-            
-            // Always fetch latest plants from server after sync (or if no sync needed)
-            setTimeout(() => {
-                getPlantsFromServer();
-            }, isTherePlantsToSync ? 1000 : 0); // Wait 1 second if we synced plants
-        } else {
-            console.log("Navigator reports online but server is not reachable");
+        // Clear any pending sync timeout
+        if (syncTimeout) {
+            clearTimeout(syncTimeout);
         }
+        
+        // Set a new timeout to debounce multiple online events
+        syncTimeout = setTimeout(async () => {
+            // Check if there are plants in local storage to sync and update
+            const isTherePlantsToSync = await checkIfThereIsSyncPlantAndUpdate();
+            // If there are no plants to sync, get plants from the server
+            if (!isTherePlantsToSync) {
+                console.log("Back online - syncing completed");
+            }
+            
+            // After sync completes, clear the timeout
+            syncTimeout = null;
+        }, 1000); // Wait 1 second to debounce multiple events
     });
 }
