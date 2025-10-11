@@ -17,13 +17,20 @@ async function getPlant(plantId) {
 /**
  * Render plant detail page
  */
-/**
- * Render plant detail page
- */
 exports.plantDetailPage = async (req, res) => {
     try {
-        const userName = req.params.userName || req.query.user || "Guest"; 
-        const plant = await getPlant(req.params.plantID);
+        const userName = req.params.userName || req.query.user || "Guest";
+        const plantId = req.params.plantID;
+        
+        // Check if this is an offline plant ID (starts with "offline_")
+        if (plantId.startsWith('offline_')) {
+            return res.status(404).render('error/error', { 
+                title: 'Plant Not Synced Yet',
+                message: 'This plant was created offline and hasn\'t been synced to the server yet. Please wait for it to sync when you\'re online.'
+            });
+        }
+        
+        const plant = await getPlant(plantId);
 
         if (!plant) {
             return res.status(404).render('error/error', { 
@@ -53,6 +60,13 @@ exports.plantDetailPage = async (req, res) => {
  */
 exports.checkPlantOwnership = async (req, res) => {
     try {
+        // Prevent HTTP caching of API responses
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
         const { plantId, username } = req.params;
         
         if (!plantId || !username) {
