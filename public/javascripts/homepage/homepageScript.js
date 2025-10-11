@@ -99,11 +99,6 @@ async function checkIfThereIsSyncPlantAndUpdate() {
                 const plant = entry.value || entry;
                 const localId = entry.id;
 
-                // Only sync if:
-                // 1. Plant doesn't have a server _id OR has an offline temp ID
-                // 2. Plant is not already synced (__syncStatus !== 'synced')
-                // 3. Plant is not from server (__isServerPlant !== true)
-                // 4. We're online
                 const needsSync = (!plant._id || (typeof plant._id === 'string' && plant._id.startsWith('offline_'))) 
                                     && plant.__syncStatus !== 'synced' 
                                     && !plant.__isServerPlant;
@@ -131,21 +126,18 @@ async function checkIfThereIsSyncPlantAndUpdate() {
     });
 }
 
-// Automatic background sync - no manual button needed
-// Sync happens automatically when coming online or on page load
-
 // Function to add a plant to MongoDB
 function addPlantToMongoDB(plantDetails, plantId = null) {
     console.log("📤 Syncing plant to server:", plantDetails.plantName);
 
-    return new Promise((resolve, reject) => {
+    return new Promise(async (resolve, reject) => {
         const formData = new FormData();
         formData.append("plantName", plantDetails.plantName);
         formData.append("type", plantDetails.type);
         formData.append("description", plantDetails.description);
         formData.append("nickname", plantDetails.nickname);
 
-        // Handle photo upload - check if it's a File object (from offline storage) or Blob
+        // Handle photo upload 
         if (plantDetails.photo) {
             if (plantDetails.photo instanceof File || plantDetails.photo instanceof Blob) {
                 console.log("📷 Uploading photo with plant:", plantDetails.photo.name || 'blob');
@@ -171,7 +163,14 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
             }
 
             let responseData = null;
-            try { responseData = await response.json(); } catch (e) { /* ignore parse errors */ }
+            try { 
+                responseData = await response.json(); 
+                console.log("📋 Raw server response:", responseData);
+            } catch (e) { 
+                console.error("❌ Error parsing server response:", e);
+                reject(new Error("Failed to parse server response"));
+                return;
+            }
             
             // Debug: Log the full response structure
             console.log("📋 Server response structure:", {
@@ -181,8 +180,31 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                 fullPlantData: responseData && responseData.plant ? responseData.plant : 'no plant in response'
             });
             
-            const serverId = responseData && responseData.plant && responseData.plant._id ? responseData.plant._id : 
-                             responseData && (responseData._id || responseData.id) ? (responseData._id || responseData.id) : null;
+            // Extract the server ID with improved handling
+            let serverId = null;
+            
+            if (responseData && responseData.plant && responseData.plant._id) {
+                // Standard response format with nested plant object
+                serverId = responseData.plant._id;
+                console.log("✅ Found server ID in response.plant._id:", serverId);
+            } else if (responseData && responseData._id) {
+                // Alternative format where plant data is directly in response
+                serverId = responseData._id;
+                console.log("✅ Found server ID in response._id:", serverId);
+            } else if (responseData && responseData.id) {
+                // Another possible format
+                serverId = responseData.id;
+                console.log("✅ Found server ID in response.id:", serverId);
+            } else if (responseData && responseData.plantId) {
+                // Another possible format
+                serverId = responseData.plantId;
+                console.log("✅ Found server ID in response.plantId:", serverId);
+            } else {
+                // If no server ID found, create a temporary ID to allow handling
+                serverId = `offline_${plantId || Date.now()}`;
+                console.warn("⚠️ No server ID found in response. Using temporary ID:", serverId);
+            }
+            
             console.log("✅ Synced plant to server successfully, serverId:", serverId);
 
             if (plantId) {
@@ -221,18 +243,19 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                                 resolve();
                             });
                         } else {
-                            // No server ID returned, keep it as pending for retry
                             const updatedValue = {
                                 ...existingPlant,
-                                _id: existingPlant._id,
+                                _id: serverId, // Use our temporary ID
                                 __isServerPlant: false,
                                 __syncStatus: 'pending',
-                                __lastSyncTime: Date.now()
+                                __lastSyncTime: Date.now(),
+                                __offlineCreated: true, // Flag as offline created
+                                __syncAttempted: true // Flag that we tried to sync
                             };
 
                             const putReq = store.put({ id: plantId, value: updatedValue });
                             putReq.addEventListener('success', async () => {
-                                console.log('⚠️  Sync attempted but no server ID returned for plant:', plantId);
+                                console.log('⚠️ Plant marked with temporary ID for later sync:', serverId);
                                 try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
                                 resolve();
                             });
@@ -348,13 +371,52 @@ async function getPlantsFromIDB() {
     console.log("📦 LOADING FROM INDEXEDDB CACHE (OFFLINE MODE)");
     console.log("═══════════════════════════════════════════");
     try {
-        plantLists = await getAllPlantsFromIDB();
-        console.log("📦 Plants loaded from IndexedDB:", plantLists.length);
+        let allPlants = await getAllPlantsFromIDB();
+        console.log("📦 Total plants in IndexedDB:", allPlants.length);
+        
+        // Create a map to track duplicates by signature
+        const plantSignatures = new Map();
+        const filteredPlants = [];
+        
+        allPlants.forEach(plant => {
+            const signature = `${plant.plantName}|${plant.nickname}|${plant.type}`.toLowerCase();
+            const isOffline = plant._id && plant._id.startsWith('offline_');
+            const isServerPlant = plant.__isServerPlant === true;
+            
+            // Priority: Server plants > Offline plants
+            if (!plantSignatures.has(signature)) {
+                // First time seeing this plant
+                plantSignatures.set(signature, plant);
+                filteredPlants.push(plant);
+            } else {
+                // We've seen this plant before - check priority
+                const existing = plantSignatures.get(signature);
+                const existingIsServer = existing.__isServerPlant === true;
+                const existingIsOffline = existing._id && existing._id.startsWith('offline_');
+                
+                // Replace offline with server version
+                if (existingIsOffline && isServerPlant) {
+                    console.log(`🔄 Replacing offline plant with server version: ${plant.plantName}`);
+                    const index = filteredPlants.indexOf(existing);
+                    if (index !== -1) {
+                        filteredPlants[index] = plant;
+                    }
+                    plantSignatures.set(signature, plant);
+                } else if (isOffline && existingIsServer) {
+                    // Skip this offline version, we already have server version
+                    console.log(`⏭️  Skipping offline duplicate: ${plant.plantName}`);
+                }
+            }
+        });
+        
+        plantLists = filteredPlants;
+        console.log("📦 Plants after deduplication:", plantLists.length);
         console.log("🔍 Plant types in IndexedDB:", plantLists.map(p => ({
             name: p.plantName,
             hasId: !!p._id,
             isServerPlant: !!p.__isServerPlant,
-            source: p._id ? 'server' : 'offline'
+            isOffline: p._id && p._id.startsWith('offline_'),
+            source: p.__isServerPlant ? 'server' : 'offline'
         })));
         applyFilterAndSort(); // Apply current filter and sort
     } catch (error) {
@@ -380,21 +442,42 @@ async function addAllPlantsToIDB(plants) {
         // Build a map of existing server plants by _id for quick lookup
         const existingServerPlantsMap = new Map();
         const pendingPlants = [];
+        const offlinePlantsToRemove = []; // Track offline plants that match server plants
         
         existingPlants.forEach(item => {
             const plant = item.value || item;
             if (plant.__isServerPlant && plant._id) {
                 existingServerPlantsMap.set(plant._id, item.id); // Map server ID to local store ID
             } else if (plant.__syncStatus === 'pending') {
-                pendingPlants.push(plant);
+                pendingPlants.push({ plant, localId: item.id });
+            } else if (plant._id && plant._id.startsWith('offline_')) {
+                // Track offline plants for potential cleanup
+                offlinePlantsToRemove.push({ plant, localId: item.id });
             }
         });
         
-        console.log(`📊 Cache state: ${existingServerPlantsMap.size} server plants, ${pendingPlants.length} pending sync`);
+        console.log(`📊 Cache state: ${existingServerPlantsMap.size} server plants, ${pendingPlants.length} pending sync, ${offlinePlantsToRemove.length} offline plants`);
         
-        // Add or update server plants
+        // Add or update server plants and clean up synced offline duplicates
         const transaction = db.transaction(['plants'], 'readwrite');
         const store = transaction.objectStore('plants');
+        
+        // Create a Set of server plants for duplicate detection
+        const serverPlantSignatures = new Set();
+        plants.forEach(plant => {
+            // Create a unique signature based on key properties
+            const signature = `${plant.plantName}|${plant.nickname}|${plant.type}`.toLowerCase();
+            serverPlantSignatures.add(signature);
+        });
+        
+        // Remove offline plants that now exist on server (matched by signature)
+        for (const { plant, localId } of offlinePlantsToRemove) {
+            const signature = `${plant.plantName}|${plant.nickname}|${plant.type}`.toLowerCase();
+            if (serverPlantSignatures.has(signature)) {
+                console.log(`🗑️ Removing synced offline plant: ${plant.plantName} (ID: ${localId})`);
+                store.delete(localId);
+            }
+        }
         
         for (const plant of plants) {
             const serverPlant = { 

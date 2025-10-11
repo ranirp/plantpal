@@ -1,19 +1,27 @@
-<script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
-<script src="/javascripts/utils/connectivityCheck.js"></script>
-<script src="/javascripts/user/userScript.js"></script>
-<script src="/javascripts/chat/chatScript.js"></script>
-<script src="/javascripts/chat/chatRenderScript.js"></script>
-<script src="/javascripts/chat/chatIDBUtility.js"></script>
-<script src="/javascripts/user/userRenderScript.js"></script>
-<script src="/tw-elements/dist/js/tw-elements.umd.min.js"></script>
-
-<!-- Import compiled site styles (includes chat styles) -->
-<link rel="stylesheet" href="/css/outputStyles.css">
+<!DOCTYPE html>
+<html data-theme="cupcake">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Chat about plants with other plant lovers in the PlantPal community. Share knowledge, arrange trades, and make connections.">
+    <title>PlantPal - Chat</title>
+    <link rel="stylesheet" href="/css/outputStyles.css" />
+    <link rel="manifest" href="/manifest.json"/>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" defer></script>
+    <script src="/javascripts/utils/connectivityCheck.js" defer></script>
+    <script src="/javascripts/user/userScript.js" defer></script>
+    <script src="/javascripts/chat/chatScript.js" defer></script>
+    <script src="/javascripts/chat/chatRenderScript.js" defer></script>
+    <script src="/javascripts/chat/chatIDBUtility.js" defer></script>
+    <script src="/javascripts/user/userRenderScript.js" defer></script>
+    <script src="/tw-elements/dist/js/tw-elements.umd.min.js" defer></script>
+</head>
+<body>
 
 <script>
     var plantId = '<%= data._id %>';
     var loggedInUser = '<%= username || data.nickname || "Guest" %>';
-    window.onload = init;
+    // Let chatScript.js handle initialization through DOMContentLoaded
 </script>
 
 <div class="flex flex-col h-full">
@@ -21,9 +29,11 @@
     <div class="bg-gray-100 p-4 rounded-t-lg border border-gray-300">
         <div class="flex justify-between items-center">
             <div class="text-xl font-medium">Chat on: <%= data.plantName %></div>
-            <div class="flex items-center border-2 border-gray-700 border-opacity-100 rounded-full px-3 py-1">
-                <span id="chatStatusDot" class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
-                <span id="chatStatusText" class="text-base">Offline</span>
+            <div class="flex items-center">
+                <div class="flex items-center border-2 border-gray-700 border-opacity-100 rounded-full px-3 py-1">
+                    <span id="chatStatusDot" class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
+                    <span id="chatStatusText" class="text-base">Offline</span>
+                </div>
             </div>
         </div>
     </div>

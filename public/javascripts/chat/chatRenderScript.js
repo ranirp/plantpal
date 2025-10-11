@@ -1,8 +1,15 @@
 // Chat rendering utilities for client-side - Facebook Messenger Style
 
 function createChatMessageDiv(message) {
+    console.log("Creating message div with:", message);
     const chatContainer = document.createElement("div");
-    const isOwnMessage = (message.username || message.userName) === loggedInUser;
+    
+    // Ensure we have the username in a consistent format
+    const username = message.username || message.userName || 'Unknown';
+    // Compare properly to loggedInUser
+    const isOwnMessage = username === loggedInUser;
+    
+    console.log("Message from:", username, "logged in user:", loggedInUser, "is own:", isOwnMessage);
     
     // Create message container with proper alignment
     chatContainer.classList.add("mb-2", "flex", "items-center", "gap-2", isOwnMessage ? "justify-end" : "justify-start");
@@ -15,7 +22,6 @@ function createChatMessageDiv(message) {
     const avatarInner = document.createElement("div");
     avatarInner.classList.add("rounded-full", "w-10", "h-10", "flex", "items-center", "justify-center");
 
-    const username = message.username || message.userName || '';
     const initials = username.substring(0, 2).toUpperCase();
 
     const avatarText = document.createElement("span");
@@ -52,9 +58,10 @@ function createChatMessageDiv(message) {
         messageBubble.style.background = "#e5e7eb";
     }
     
-    // Add message text
+    // Add message text - check all possible property names
     const messageText = document.createElement("span");
     const textContent = message.chatmessage || message.chatMessage || message.message || '';
+    console.log("Message content:", textContent);
     messageText.textContent = textContent;
     messageBubble.appendChild(messageText);
     

@@ -3,10 +3,12 @@
     "short_name": "PlantPal",
     "description": "A progressive web app for sharing plants and care tips with the community",
     "start_url": "/",
+    "scope": "/",
     "display": "standalone",
     "background_color": "#ffffff",
     "theme_color": "#4CAF50",
     "orientation": "any",
+    "categories": ["lifestyle", "social", "plants", "garden"],
     "icons": [
         {
             "src": "/images/icon-512.png",

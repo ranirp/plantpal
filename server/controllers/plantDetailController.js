@@ -24,9 +24,21 @@ exports.plantDetailPage = async (req, res) => {
         
         // Check if this is an offline plant ID (starts with "offline_")
         if (plantId.startsWith('offline_')) {
-            return res.status(404).render('error/error', { 
-                title: 'Plant Not Synced Yet',
-                message: 'This plant was created offline and hasn\'t been synced to the server yet. Please wait for it to sync when you\'re online.'
+            console.log('Rendering offline plant detail page for:', plantId);
+            // Render the plant details page but with offline mode enabled
+            // The frontend will load the plant data from IndexedDB
+            return res.render('details/plantDetails', { 
+                title: 'Plant Details (Offline)',
+                data: { 
+                    _id: plantId,
+                    isOfflinePlant: true,
+                    plantName: 'Loading...',
+                    description: 'Loading from local storage...',
+                    nickname: userName,
+                    type: 'unknown'
+                },
+                username: userName,
+                isOfflineMode: true
             });
         }
         
@@ -45,6 +57,7 @@ exports.plantDetailPage = async (req, res) => {
             title: `${plant.plantName} - Plant Details`,
             data: plant,
             username: userName,
+            isOfflineMode: false
         });
     } catch (err) {
         console.error('Error rendering plant detail page:', err);

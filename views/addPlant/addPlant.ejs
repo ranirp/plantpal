@@ -3,16 +3,19 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="Share your plants with the PlantPal community. Upload photos, add details, and connect with other plant enthusiasts.">
         <title>Share Your Plant</title>
         <link rel="stylesheet" href="/css/outputStyles.css" />
         <link 
             rel="stylesheet" 
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" 
+            media="print" 
+            onload="this.media='all'" 
         />
-        <script src="/javascripts/utils/connectivityCheck.js"></script>
-        <script src="/javascripts/addPlant/addPlantScript.js"></script>
-        <script src="/javascripts/addPlant/addPlantUtility.js"></script>
-        <script src="/javascripts/user/userScript.js"></script>
+        <script src="/javascripts/utils/connectivityCheck.js" defer></script>
+        <script src="/javascripts/addPlant/addPlantScript.js" defer></script>
+        <script src="/javascripts/addPlant/addPlantUtility.js" defer></script>
+        <script src="/javascripts/user/userScript.js" defer></script>
         <script src="/javascripts/user/userIDBUtility.js"></script>
     </head>
     <body onload="init()" class="min-h-screen bg-gray-50">

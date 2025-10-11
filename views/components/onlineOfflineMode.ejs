@@ -41,8 +41,21 @@
         console.log('🔍 CONNECTIVITY CHECK - Starting...');
         console.log('📍 Navigator.onLine:', navigator.onLine);
         
-        if (typeof checkServerConnectivity !== 'function') {
-            console.error('❌ ERROR: checkServerConnectivity function not found!');
+        // Wait for connectivityCheck.js to be loaded
+        const waitForConnectivityCheck = async (maxAttempts = 10) => {
+            for (let i = 0; i < maxAttempts; i++) {
+                if (typeof checkServerConnectivity === 'function') {
+                    return true;
+                }
+                console.log(`⏳ Waiting for connectivity check script (attempt ${i+1}/${maxAttempts})...`);
+                await new Promise(resolve => setTimeout(resolve, 300));
+            }
+            return false;
+        };
+        
+        const isLoaded = await waitForConnectivityCheck();
+        if (!isLoaded) {
+            console.error('❌ ERROR: checkServerConnectivity function not found after multiple attempts!');
             console.error('Make sure connectivityCheck.js is loaded before this component');
             updateOnlineStatus(navigator.onLine);
             return;

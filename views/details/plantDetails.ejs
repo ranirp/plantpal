@@ -3,14 +3,49 @@
     <head>
         <meta charset="UTF-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <meta name="description" content="View detailed information about <%= data.plantName %> - including care instructions, owner details, and options to chat about this plant.">
         <title><%= data.plantName %> - Plant Details</title>
         <link rel="stylesheet" href="/css/outputStyles.css" />
         <link rel="manifest" href="/manifest.json"/>
-        <script>
+        <script defer>
             loggedInUser = "<%= username %>";
-            plantId = "<%= data._id %>";
+            plantId = "<%= Buffer.from(data._id.toString()).toString('base64') %>"; // Base64 encoded plant ID
             plantOwner = "<%= data.nickname %>";
+            isOfflineMode = <%= typeof isOfflineMode !== 'undefined' && isOfflineMode ? 'true' : 'false' %>;
+            isOfflinePlant = <%= data.isOfflinePlant ? 'true' : 'false' %>;
         </script>
+        <% if (typeof isOfflineMode !== 'undefined' && isOfflineMode) { %>
+        <!-- Load plant data from IndexedDB for offline plants -->
+        <script src="/javascripts/addPlant/addPlantUtility.js"></script>
+        <script>
+            // Load offline plant data when page loads
+            document.addEventListener('DOMContentLoaded', async function() {
+                if (isOfflinePlant) {
+                    console.log('🔄 Loading offline plant data from IndexedDB...');
+                    try {
+                        const db = await openSyncPlantIDB();
+                        const allPlants = await getAllPlantsFromIDB();
+                        const decodedPlantId = atob(plantId); // Decode base64
+                        
+                        // Find the plant by ID
+                        const plant = allPlants.find(p => p._id === decodedPlantId);
+                        
+                        if (plant) {
+                            console.log('✅ Found offline plant:', plant);
+                            // Update the page with actual plant data
+                            document.title = plant.plantName + ' - Plant Details (Offline)';
+                            // The plant details component will be updated via the plantDetailsScript.js
+                            window.offlinePlantData = plant;
+                        } else {
+                            console.error('❌ Offline plant not found in IndexedDB');
+                        }
+                    } catch (error) {
+                        console.error('❌ Error loading offline plant:', error);
+                    }
+                }
+            });
+        </script>
+        <% } %>
     </head>
     <body>
         <div class="flex flex-col h-screen w-full lg:flex-row gap-4 p-4">

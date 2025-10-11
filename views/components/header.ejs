@@ -2,6 +2,18 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#4CAF50">
 <link rel="manifest" href="/manifest.json">
+<!-- iOS PWA meta tags -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="PlantPal">
+<!-- iOS icon links -->
+<link rel="apple-touch-icon" href="/images/icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="/images/icon-512.png">
+<link rel="apple-touch-icon" sizes="384x384" href="/images/icon-384.png">
+<link rel="apple-touch-icon" sizes="192x192" href="/images/icon-192.png">
+<link rel="apple-touch-icon" sizes="96x96" href="/images/icon-96.png">
+<link rel="apple-touch-icon" sizes="72x72" href="/images/icon-72.png">
+<link rel="apple-touch-icon" sizes="48x48" href="/images/icon-48.png">
 <script>
     // Register service worker for all pages
     if ("serviceWorker" in navigator) {
@@ -26,6 +38,41 @@
             });
         });
     }
+    
+    // PWA installation logic
+    let deferredPrompt;
+    const installButton = document.getElementById('installPWA');
+    
+    window.addEventListener('beforeinstallprompt', (e) => {
+        // Prevent Chrome 67 and earlier from automatically showing the prompt
+        e.preventDefault();
+        // Stash the event so it can be triggered later
+        deferredPrompt = e;
+        // Update UI to notify the user they can add to home screen
+        installButton.classList.remove('hidden');
+        
+        installButton.addEventListener('click', (e) => {
+            // Show the install prompt
+            deferredPrompt.prompt();
+            // Wait for the user to respond to the prompt
+            deferredPrompt.userChoice.then((choiceResult) => {
+                if (choiceResult.outcome === 'accepted') {
+                    console.log('User accepted the A2HS prompt');
+                    // Hide the button after installation
+                    installButton.classList.add('hidden');
+                } else {
+                    console.log('User dismissed the A2HS prompt');
+                }
+                deferredPrompt = null;
+            });
+        });
+    });
+    
+    // Hide the install button when the PWA is already installed
+    window.addEventListener('appinstalled', (evt) => {
+        console.log('App was installed');
+        installButton.classList.add('hidden');
+    });
 </script>
 
 <header class="bg-white shadow-md px-4 sm:px-6 w-full fixed top-0 flex flex-row justify-between items-center z-50 h-20">
@@ -33,6 +80,14 @@
         <img src="/images/logo.jpg" alt="Logo" class="h-12 w-12 sm:h-14 sm:w-14 mr-3 rounded-xl object-cover" style="max-width: 66px; max-height: 66px;" />
         <h1 class="text-lg sm:text-2xl font-bold text-neutral">PlantPal</h1>
     </div>
+    
+    <!-- Install PWA Button - Hidden by default, shown when installation is possible -->
+    <button id="installPWA" class="btn btn-sm btn-primary hidden mx-2">
+        Install App <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="ml-2" viewBox="0 0 16 16">
+            <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>
+            <path d="M7.646 11.854a.5.5 0 0 0 .708 0l3-3a.5.5 0 0 0-.708-.708L8.5 10.293V1.5a.5.5 0 0 0-1 0v8.793L5.354 8.146a.5.5 0 1 0-.708.708l3 3z"/>
+        </svg>
+    </button>
 
     <div class="flex flex-row items-center text-2xl sm:text-4xl gap-2 sm:gap-3 flex-shrink-0">
         <h1 class="text-gray-950 hidden sm:inline font-bold">Welcome</h1>

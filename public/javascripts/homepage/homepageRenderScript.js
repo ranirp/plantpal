@@ -109,8 +109,20 @@ function createdCard(plant) {
         photoPath = placeHolderImage;
     }
 
+    // Check if this is an offline plant
+    const plantId = plant._id || plant.id || plant.plantId;
+    const isOfflinePlant = !plantId || (typeof plantId === 'string' && plantId.startsWith('offline_'));
+    
     // Add classes for styling the card
-    card.className = "card shadow-lg bg-white cursor-pointer hover:shadow-xl transition-shadow";
+    let cardClasses = "card shadow-lg bg-white transition-shadow";
+    if (isOfflinePlant) {
+        // Offline plants get a different style and no hover effect
+        cardClasses += " opacity-75 cursor-not-allowed border-2 border-dashed border-yellow-400";
+    } else {
+        // Online plants are clickable
+        cardClasses += " cursor-pointer hover:shadow-xl";
+    }
+    card.className = cardClasses;
     
     // Set the onclick event to show plant details page
     card.onclick = function() {
@@ -118,22 +130,13 @@ function createdCard(plant) {
         const plantId = plant._id || plant.id || plant.plantId;
         
         if (plantId) {
-            // Plant has a valid ID, navigate to details page
+            // Plant has a valid ID (can be offline or server), navigate to details page
             console.log('Navigating to plant details with ID:', plantId);
             showDetailsPage(plantId);
         } else {
-            // For offline plants without any ID, we need to handle them differently
-            console.warn('Plant without any ID found (likely corrupted offline plant):', plant);
-            
-            // Generate a temporary identifier based on plant data
-            const tempId = generateOfflinePlantId(plant);
-            if (tempId) {
-                console.log('Using generated temporary ID for plant:', tempId);
-                showDetailsPage(tempId);
-            } else {
-                // If we still can't create an ID, show a more helpful error
-                alert('This plant appears to be corrupted or incomplete. Please try refreshing the page or contact support if the issue persists.');
-            }
+            // For plants without any ID (corrupted data)
+            console.error('Plant without any ID found:', plant);
+            alert('⚠️ Unable to view this plant.\n\nThis plant data appears to be incomplete. Please try refreshing the page.');
         }
     };
 
@@ -167,12 +170,23 @@ function createdCard(plant) {
     title.className = "card-title text-lg font-bold";
     title.textContent = plant.plantName;
 
+    // Create badges container
+    var badgesContainer = document.createElement('div');
+    badgesContainer.className = "flex gap-2 mt-2 flex-wrap";
+    
     // Create type badge
     var typeBadge = document.createElement('div');
-    typeBadge.className = "badge badge-primary capitalize mt-2";
+    typeBadge.className = "badge badge-primary capitalize";
     typeBadge.textContent = plant.type;
-
-    // Removed sync status indicator to clean up UI
+    badgesContainer.appendChild(typeBadge);
+    
+    // Add sync status badge for offline plants
+    if (isOfflinePlant) {
+        var syncBadge = document.createElement('div');
+        syncBadge.className = "badge badge-warning gap-1";
+        syncBadge.innerHTML = '<i class="fas fa-sync-alt"></i> Pending Sync';
+        badgesContainer.appendChild(syncBadge);
+    }
 
     // Create info container
     var infoDiv = document.createElement('div');
@@ -212,7 +226,7 @@ function createdCard(plant) {
 
     // Append all elements to card body
     cardBody.appendChild(title);
-    cardBody.appendChild(typeBadge);
+    cardBody.appendChild(badgesContainer);
     cardBody.appendChild(infoDiv);
     cardBody.appendChild(description);
 

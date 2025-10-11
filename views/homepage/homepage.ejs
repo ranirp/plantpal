@@ -1,15 +1,54 @@
 <!DOCTYPE html>
 <html lang="en" data-theme="cupcake">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="PlantPal - A community for plant lovers to share, trade, and chat about plants. Find your next plant buddy here!">
     <title>Plant Sharing Community</title>
     <link rel="stylesheet" href="/css/outputStyles.css" />
-    <script src="/javascripts/utils/connectivityCheck.js"></script>
-    <script src="/javascripts/user/userIDBUtility.js"></script>
-    <script src="/javascripts/user/userScript.js"></script>
-    <script src="/javascripts/user/userRenderScript.js"></script>
-    <script src="/javascripts/addPlant/addPlantUtility.js"></script>
-    <script src="/javascripts/homepage/homepageScript.js"></script>
-    <script src="/javascripts/homepage/homepageRenderScript.js"></script>
+    <link rel="manifest" href="/manifest.json" />
+    <!-- PWA icons -->
+    <link rel="apple-touch-icon" href="/images/icon-192.png">
+    <link rel="apple-touch-icon" sizes="512x512" href="/images/icon-512.png">
+    <meta name="theme-color" content="#4CAF50">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="PlantPal">
+    <!-- Scripts -->
+    <script src="/javascripts/utils/connectivityCheck.js" defer></script>
+    <script src="/javascripts/user/userIDBUtility.js" defer></script>
+    <script src="/javascripts/user/userScript.js" defer></script>
+    <script src="/javascripts/user/userRenderScript.js" defer></script>
+    <script src="/javascripts/addPlant/addPlantUtility.js" defer></script>
+    <script src="/javascripts/homepage/homepageScript.js" defer></script>
+    <script src="/javascripts/homepage/homepageRenderScript.js" defer></script>
+    
+    <!-- Register Service Worker -->
+    <script>
+        // Register service worker for PWA functionality
+        if ("serviceWorker" in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register("/serviceWorker.js", {
+                    scope: "/",
+                }).then((registration) => {
+                    console.log("Service Worker registered successfully:", registration);
+                    
+                    // Check for updates
+                    registration.addEventListener('updatefound', () => {
+                        console.log('Service Worker update found');
+                        const newWorker = registration.installing;
+                        newWorker.addEventListener('statechange', () => {
+                            if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                                console.log('New content is available; please refresh.');
+                            }
+                        });
+                    });
+                }).catch((error) => {
+                    console.error("Service Worker registration failed:", error);
+                });
+            });
+        }
+    </script>
 </head>
 <body onload="init()">
     <!--Include the header component at the top-->

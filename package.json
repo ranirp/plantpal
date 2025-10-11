@@ -6,7 +6,10 @@
   "scripts": {
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "tailwind": "npx tailwindcss -i ./public/css/inputStyles.css -o ./public/css/outputStyles.css --watch"
+    "tailwind": "npx tailwindcss -i ./public/css/inputStyles.css -o ./public/css/outputStyles.css --watch",
+    "build:css": "node build-css.js",
+    "build:js": "node build-js.js",
+    "build": "npm run build:css && npm run build:js"
   },
   "dependencies": {
     "body-parser": "^1.20.2",
@@ -25,6 +28,7 @@
   },
   "devDependencies": {
     "autoprefixer": "^10.4.19",
+    "cssnano": "^6.0.5",
     "daisyui": "^4.10.1",
     "nodemon": "^3.1.10",
     "postcss": "^8.4.38",
