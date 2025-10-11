@@ -1,6 +1,14 @@
 /**
- * @fileoverview Multer configuration for handling file uploads.
- * Sets up storage options and file naming conventions for uploaded plant photos.
+ * @fileoverview Multer configuration for handling file uploads in the Plant Sharing Community.
+ * Configures file storage, naming conventions, and validation for plant photos.
+ * 
+ * @module multer.config
+ * @requires multer
+ * @requires path
+ * 
+ * @typedef {Object} MulterConfig
+ * @property {Object} storage - Storage engine configuration
+ * @property {Function} fileFilter - File type validation function
  */
 
 const multer = require('multer');
