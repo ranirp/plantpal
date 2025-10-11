@@ -25,6 +25,14 @@ self.addEventListener('install', event => {
 
 // Fetch event - serve from cache, fallback to network
 self.addEventListener('fetch', event => {
+    // Skip caching for API requests and Socket.IO
+    if (event.request.url.includes('/api/') || 
+        event.request.url.includes('/socket.io/') ||
+        event.request.url.includes('check=true')) {
+        // Always go to network for API calls
+        return event.respondWith(fetch(event.request));
+    }
+    
     event.respondWith(
         caches.match(event.request)
             .then(response => {
@@ -33,7 +41,12 @@ self.addEventListener('fetch', event => {
                     return response;
                 }
                 // Not in cache - return the result from the live server
-                return fetch(event.request);
+                return fetch(event.request).catch(() => {
+                    // If network fails, return a meaningful error for navigation requests
+                    if (event.request.mode === 'navigate') {
+                        return caches.match('/offline');
+                    }
+                });
             })
     );
 });
