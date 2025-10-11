@@ -1,8 +1,8 @@
-// Client-side doesn't support Node.js style requires
-// const { render } = require("ejs");
-// const chatMessage = require("../../../server/models/chatModel");
+/**
+ * @fileoverview Real-time chat functionality implementation using Socket.IO.
+ * Handles socket connections, message exchange, and offline/online state management.
+ */
 
-// Initialize socket when DOM is ready to prevent undefined io error
 let socket;
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Initializing socket connection...");
@@ -123,66 +123,7 @@ function init() {
     }
 }
 
-// Function to check actual server connectivity
-async function checkServerConnectivity() {
-    if (!navigator.onLine) {
-        console.log('📡 Browser reports device is offline');
-        return false;
-    }
-    
-    try {
-        // Use a timestamp to prevent caching
-        const timestamp = new Date().getTime();
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 5000); // Increased timeout to 5 seconds
-        
-        // Try the chat ping endpoint first
-        const chatCheckEndpoint = `/api/chat/ping?_=${timestamp}`;
-        console.log(`🔄 Testing chat connectivity with: ${chatCheckEndpoint}`);
-        
-        try {
-            const chatResponse = await fetch(chatCheckEndpoint, {
-                method: "GET",
-                cache: "no-cache",
-                headers: {
-                    'Cache-Control': 'no-cache, no-store, must-revalidate',
-                    'Pragma': 'no-cache',
-                    'Expires': '0',
-                    'X-Requested-With': 'XMLHttpRequest'
-                },
-                signal: controller.signal
-            });
-            
-            clearTimeout(timeoutId);
-            if (chatResponse.ok) {
-                console.log('✅ Chat API is responsive');
-                return true;
-            }
-        } catch (chatError) {
-            console.log('Chat endpoint check failed, trying fallback:', chatError.message);
-        }
-        
-        // Fallback to simple route check
-        const timeoutId2 = setTimeout(() => controller.abort(), 3000);
-        const response = await fetch(`/?check=true&_=${timestamp}`, {
-            method: "GET",
-            cache: "no-cache",
-            headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId2);
-        console.log(`📶 Server responded with status: ${response.status}`);
-        return response.ok || response.status === 304; // Accept 304 Not Modified as success
-    } catch (error) {
-        console.log('📡 Server connectivity check failed:', error.message);
-        return false;
-    }
-}
+// Note: checkServerConnectivity is now loaded from utils/connectivityCheck.js
 
 function listenForOnlineSync() {
     // Check initial status with server connectivity
@@ -307,9 +248,13 @@ async function sendMessage(isSuggestingName = false) {
     const isActuallyOnline = navigator.onLine && await checkServerConnectivity();
     
     if (isActuallyOnline) {
-        // Online: Send message directly
+        // Online: Send message - DON'T render immediately
+        // Let socket.io broadcast handle rendering for everyone including sender
         input.value = ""; // Clear input field
         console.log("Sending chat message (online):", chatMessage);
+        
+        // Save to database and emit to socket
+        // The socket will broadcast back to everyone, including the sender
         addChatToDB(chatMessage);
         socket.emit("chat", chatMessage);
     } else {
@@ -323,7 +268,8 @@ async function sendMessage(isSuggestingName = false) {
             openSyncChatsIDB().then((db) => {
                 addNewChatToSync(db, chatMessage).then(() => {
                     console.log("Chat message queued for sync");
-                    renderChatMessage([chatMessage]); // Show message immediately in UI
+                    // Only render immediately for offline messages (no socket broadcast)
+                    renderChatMessage([chatMessage]);
                 });
             });
         } else {
