@@ -33,7 +33,7 @@ exports.getChatMessagesByPlantId = async (req, res, next) => {
             });
         }
 
-        const chats = await ChatMessage.find({ plantID: plantID }).sort({ chatTime: -1 });
+        const chats = await ChatMessage.find({ plantID: plantID }).sort({ chatTime: 1 }); // Changed to ascending order (oldest first)
 
         console.log(`Chat messages retrieved successfully! Count: ${chats.length}`);
         res.json({
