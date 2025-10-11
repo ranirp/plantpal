@@ -22,12 +22,18 @@ function generateOfflinePlantId(plant) {
 
 // Function to render the list of plants
 function renderPlantList(plantList) {
-    console.log("renderPlantList called with:", plantList);
-    console.log("Number of plants to render:", plantList.length);
+    console.log("🎨 renderPlantList called");
+    console.log("📊 Number of plants to render:", plantList ? plantList.length : 0);
+    console.log("🌱 Plants data:", plantList);
     
     // Access the container element where plant cards will be displayed
     const plantListContainer = document.getElementById('plantList');
-    console.log("Plant list container found:", !!plantListContainer);
+    console.log("📦 Plant list container found:", !!plantListContainer);
+    
+    if (!plantListContainer) {
+        console.error("❌ CRITICAL: plantList container not found in DOM!");
+        return;
+    }
 
     // Clear the container to avoid duplicates
     plantListContainer.innerHTML = '';
