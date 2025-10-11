@@ -2,8 +2,8 @@ const CACHE_NAME = 'plantpal-cache-v1';
 const urlsToCache = [
     '/',
     '/css/outputStyles.css',
-    '/javascripts/home/homeRenderScript.js',
-    '/javascripts/home/homeScript.js',
+    '/javascripts/homepage/homepageRenderScript.js',
+    '/javascripts/homepage/homepageScript.js',
     '/javascripts/addPlant/addPlantScript.js',
     '/javascripts/chat/chatScript.js',
     '/images/logo.jpg',
