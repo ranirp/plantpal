@@ -7,8 +7,8 @@ const AddPlant = require('../models/addPlantModel');
 
 // Simple in-memory rate limiting (for production, use Redis or a proper rate limiter)
 const submissionTracker = new Map();
-const RATE_LIMIT_WINDOW = 30000; // 30 seconds
-const MAX_SUBMISSIONS = 1; // 1 submission per 30 seconds per IP
+const RATE_LIMIT_WINDOW = 10000; // 10 seconds (reduced from 30)
+const MAX_SUBMISSIONS = 3; // 3 submissions per 10 seconds per IP (increased from 1)
 
 /**
  * Check if IP is rate limited
@@ -116,11 +116,19 @@ exports.addNewPlantToDB = async (req, res, next) => {
         
         console.log('Plant added successfully:', savedPlant);
 
-        res.status(201).json({
+        const response = {
             success: true,
             message: "Plant added successfully",
             plant: savedPlant
+        };
+        
+        console.log('Server response structure:', {
+            success: response.success,
+            plantId: response.plant._id,
+            plantData: response.plant ? 'present' : 'missing'
         });
+
+        res.status(201).json(response);
     } catch (err) {
         console.error('Error adding new plant:', err);
         
@@ -150,6 +158,13 @@ exports.addNewPlantToDB = async (req, res, next) => {
  */
 exports.getAllPlants = async (req, res, next) => {
     try {
+        // Prevent HTTP caching of API responses
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
         const { sortBy = 'createdAt', order = 'desc', since } = req.query;
 
         let sortOptions = {};
