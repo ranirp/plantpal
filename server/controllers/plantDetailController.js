@@ -17,6 +17,9 @@ async function getPlant(plantId) {
 /**
  * Render plant detail page
  */
+/**
+ * Render plant detail page
+ */
 exports.plantDetailPage = async (req, res) => {
     try {
         const userName = req.params.userName || req.query.user || "Guest"; 
@@ -41,6 +44,49 @@ exports.plantDetailPage = async (req, res) => {
         res.status(500).render('error/error', { 
             title: 'Server Error',
             message: 'An error occurred while loading the plant details.'
+        });
+    }
+};
+
+/**
+ * Check if a user owns a specific plant
+ */
+exports.checkPlantOwnership = async (req, res) => {
+    try {
+        const { plantId, username } = req.params;
+        
+        if (!plantId || !username) {
+            return res.status(400).json({
+                success: false,
+                message: 'Plant ID and username are required'
+            });
+        }
+
+        const plant = await getPlant(plantId);
+        
+        if (!plant) {
+            return res.status(404).json({
+                success: false,
+                message: 'Plant not found',
+                isOwner: false
+            });
+        }
+
+        const isOwner = plant.nickname === username;
+        
+        res.json({
+            success: true,
+            isOwner: isOwner,
+            plantId: plantId,
+            username: username,
+            plantOwner: plant.nickname
+        });
+    } catch (err) {
+        console.error('Error checking plant ownership:', err);
+        res.status(500).json({
+            success: false,
+            message: 'Error checking plant ownership',
+            isOwner: false
         });
     }
 };
