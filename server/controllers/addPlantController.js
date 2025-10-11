@@ -5,6 +5,35 @@
 
 const AddPlant = require('../models/addPlantModel');
 
+// Simple in-memory rate limiting (for production, use Redis or a proper rate limiter)
+const submissionTracker = new Map();
+const RATE_LIMIT_WINDOW = 30000; // 30 seconds
+const MAX_SUBMISSIONS = 1; // 1 submission per 30 seconds per IP
+
+/**
+ * Check if IP is rate limited
+ */
+function isRateLimited(ip) {
+    const now = Date.now();
+    const userSubmissions = submissionTracker.get(ip) || [];
+    
+    // Clean old submissions
+    const recentSubmissions = userSubmissions.filter(time => now - time < RATE_LIMIT_WINDOW);
+    submissionTracker.set(ip, recentSubmissions);
+    
+    return recentSubmissions.length >= MAX_SUBMISSIONS;
+}
+
+/**
+ * Record a submission
+ */
+function recordSubmission(ip) {
+    const now = Date.now();
+    const userSubmissions = submissionTracker.get(ip) || [];
+    userSubmissions.push(now);
+    submissionTracker.set(ip, userSubmissions);
+}
+
 /**
  * Renders the add plant page
  */
@@ -21,6 +50,16 @@ exports.addPlantPage = (req, res, next) => {
  */
 exports.addNewPlantToDB = async (req, res, next) => {
     try {
+        const clientIP = req.ip || req.connection.remoteAddress || req.socket.remoteAddress || 'unknown';
+        
+        // Check rate limiting
+        if (isRateLimited(clientIP)) {
+            return res.status(429).json({
+                success: false,
+                message: "Too many submissions. Please wait 30 seconds before trying again.",
+            });
+        }
+
         const { plantName, type, description, nickname } = req.body;
         
         // Validate required fields
@@ -52,11 +91,10 @@ exports.addNewPlantToDB = async (req, res, next) => {
         let photoPath = null;
         if (req.file && req.file.filename) {
             photoPath = req.file.filename; // Multer sets the filename property on successful upload
-            console.log('File uploaded successfully:', req.file);
+            console.log('File uploaded successfully:', req.file.filename);
         } else {
-            console.log('No file was uploaded or file upload failed');
-            // Use a default image if needed
-            // photoPath = 'default-plant.jpg';
+            console.log('No file was uploaded - photo will be null');
+            // Photo is optional - this is fine
         }
 
         // Create a new plant instance
@@ -72,6 +110,10 @@ exports.addNewPlantToDB = async (req, res, next) => {
 
         // Save the new plant to the database
         const savedPlant = await newPlant.save();
+        
+        // Record this submission for rate limiting
+        recordSubmission(clientIP);
+        
         console.log('Plant added successfully:', savedPlant);
 
         res.status(201).json({

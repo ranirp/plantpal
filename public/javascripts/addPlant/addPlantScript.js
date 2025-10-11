@@ -206,13 +206,21 @@ function setupCharacterCounter() {
 }
 
 // Function to register form submission event
-// Function to register form submission event
+let isSubmitting = false; 
+
 function registerFormSubmit() {
     // keep backward compatibility: id might be addPlantForm or plantForm
     const plantForm = document.getElementById("addPlantForm") || document.getElementById("plantForm");
     if (plantForm) {
         plantForm.addEventListener("submit", function(event) {
             event.preventDefault(); // Prevent default form submission
+            
+            // Prevent duplicate submissions
+            if (isSubmitting) {
+                console.log('Form submission already in progress, ignoring duplicate attempt');
+                return;
+            }
+            
             // Call custom form submission handler
             addNewPlantDetails();
         });
@@ -222,15 +230,40 @@ function registerFormSubmit() {
 }
 
 // Function to add new plant details
-// Function to add new plant details
 function addNewPlantDetails() {
+    // Prevent duplicate submissions
+    if (isSubmitting) {
+        console.log('Submission already in progress, please wait...');
+        return;
+    }
+    
+    // Set submitting flag
+    isSubmitting = true;
+    
+    // Disable submit button to prevent multiple clicks
+    const submitButton = document.querySelector('button[type="submit"]');
+    const originalButtonText = submitButton ? submitButton.innerHTML : '';
+    if (submitButton) {
+        submitButton.disabled = true;
+        submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
+    }
+    
     // Get values from the form fields
-    const plantName = document.getElementById("plantName") ? document.getElementById("plantName").value : '';
+    const plantName = document.getElementById("plantName") ? document.getElementById("plantName").value.trim() : '';
     const type = document.getElementById("type") ? document.getElementById("type").value : '';
-    const description = document.getElementById("description") ? document.getElementById("description").value : '';
-    const nickname = document.getElementById("nickname") ? document.getElementById("nickname").value : '';
+    const description = document.getElementById("description") ? document.getElementById("description").value.trim() : '';
+    const nickname = document.getElementById("nickname") ? document.getElementById("nickname").value.trim() : '';
     const photoInput = document.getElementById("photoID");
     const originalPhoto = photoInput && photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
+
+    // Function to reset form state
+    const resetFormState = () => {
+        isSubmitting = false;
+        if (submitButton) {
+            submitButton.disabled = false;
+            submitButton.innerHTML = originalButtonText;
+        }
+    };
 
     // Validate required fields
     const missing = [];
@@ -240,21 +273,19 @@ function addNewPlantDetails() {
     if (!nickname) missing.push('Nickname');
     if (missing.length) {
         alert('Please fill in all required fields: ' + missing.join(', '));
+        resetFormState();
         return;
     }
 
     if (description.length < 10) {
         alert('Description must be at least 10 characters long.');
+        resetFormState();
         return;
     }
 
     if (description.length > 1000) {
         alert('Description cannot exceed 1000 characters.');
-        return;
-    }
-
-    if (!originalPhoto && !compressedImageBlob) {
-        alert('Please select a photo for your plant.');
+        resetFormState();
         return;
     }
 
@@ -275,23 +306,23 @@ function addNewPlantDetails() {
         // Prefer to check server reachability before sending large payloads
         checkServerConnectivity().then((isActuallyOnline) => {
             if (isActuallyOnline) {
-                submitPlantDetails(plantDetails);
+                submitPlantDetails(plantDetails, resetFormState);
             } else {
-                savePlantOffline(plantDetails, originalPhoto);
+                savePlantOffline(plantDetails, originalPhoto, resetFormState);
             }
         }).catch(() => {
             // In case connectivity check fails, attempt submit if navigator.onLine
-            submitPlantDetails(plantDetails);
+            submitPlantDetails(plantDetails, resetFormState);
         });
     } else if (navigator.onLine) {
         // No connectivity check available; attempt submit
-        submitPlantDetails(plantDetails);
+        submitPlantDetails(plantDetails, resetFormState);
     } else {
-        savePlantOffline(plantDetails, originalPhoto);
+        savePlantOffline(plantDetails, originalPhoto, resetFormState);
     }
 }
 
-function savePlantOffline(plantDetails, originalPhoto) {
+function savePlantOffline(plantDetails, originalPhoto, resetFormState) {
     // Save offline metadata and basic file info to IndexedDB for later sync
     const timestamp = Date.now();
     const tempId = `offline_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
@@ -310,24 +341,28 @@ function savePlantOffline(plantDetails, originalPhoto) {
     if (typeof openSyncPlantIDB === 'function' && typeof addNewPlantToSync === 'function') {
         openSyncPlantIDB().then((db) => {
             addNewPlantToSync(db, offlinePlantDetails).then(() => {
+                resetFormState();
                 alert('🌱 Plant saved offline! It will be synced when you are back online.');
                 window.location.href = '/';
             }).catch((err) => {
                 console.error('Error saving plant offline:', err);
+                resetFormState();
                 alert('❌ Error saving plant offline. Please try again.');
             });
         }).catch((err) => {
             console.error('Error opening sync DB:', err);
+            resetFormState();
             alert('❌ Error saving plant offline. Please try again.');
         });
     } else {
         console.warn('Offline DB helpers not available; cannot save offline.');
+        resetFormState();
         alert('Unable to save offline on this device. Please try again when online.');
     }
 }
 
 // Function to submit plant details to the server
-function submitPlantDetails(plantDetails) {
+function submitPlantDetails(plantDetails, resetFormState) {
     console.log("Submitting plant details:", plantDetails);
     
     // Create form data object
@@ -361,12 +396,14 @@ function submitPlantDetails(plantDetails) {
     })
     .then(data => {
         console.log("Plant details submitted successfully:", data);
+        resetFormState();
         alert("🌱 Plant shared successfully!");
         // Redirect to homepage or show success message
         window.location.href = "/";
     })
     .catch(error => {
         console.error("Error submitting plant details:", error);
+        resetFormState();
         // Display a user-friendly error message
         alert("❌ " + error.message + "\n\nPlease check your input and try again.");
     });
