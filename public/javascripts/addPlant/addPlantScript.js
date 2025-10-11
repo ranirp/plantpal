@@ -49,36 +49,8 @@ function getLoggedInUser() {
     }
 }
 
-// Function to check actual server connectivity
-async function checkServerConnectivity() {
-    if (!navigator.onLine) {
-        return false; // If browser says offline, don't bother checking
-    }
-    
-    try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000);
-        
-        const response = await fetch('/api/plants/getAllPlants?check=true', {
-            method: 'GET',
-            cache: 'no-cache',
-            headers: {
-                'Cache-Control': 'no-cache, no-store, must-revalidate',
-                'Pragma': 'no-cache',
-                'Expires': '0'
-            },
-            signal: controller.signal
-        });
-        
-        clearTimeout(timeoutId);
-        return response.ok;
-    } catch (error) {
-        console.log('Server connectivity check failed:', error.message);
-        return false;
-    }
-}
-
 // Function to setup image preview functionality
+// Note: checkServerConnectivity is now loaded from utils/connectivityCheck.js
 /**
  * Initialize Web Worker for image processing
  */
@@ -323,20 +295,24 @@ function addNewPlantDetails() {
 }
 
 function savePlantOffline(plantDetails, originalPhoto, resetFormState) {
-    // Save offline metadata and basic file info to IndexedDB for later sync
+    // Save offline with actual File object to IndexedDB for later sync
     const timestamp = Date.now();
     const tempId = `offline_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
 
+    // Store the actual File object (not just metadata) so we can upload it later
+    // IndexedDB can store File/Blob objects directly
     const offlinePlantDetails = {
         ...plantDetails,
         _id: tempId,
-        photo: originalPhoto ? { name: originalPhoto.name, size: originalPhoto.size, type: originalPhoto.type, lastModified: originalPhoto.lastModified } : null,
+        photo: originalPhoto || null, // Store the actual File object, not metadata
         __isServerPlant: false,
         __syncStatus: 'pending',
         __createdOffline: true,
         __lastSyncTime: null,
         __tempId: tempId
     };
+
+    console.log('Saving plant offline with photo:', originalPhoto ? `File: ${originalPhoto.name}` : 'No photo');
 
     if (typeof openSyncPlantIDB === 'function' && typeof addNewPlantToSync === 'function') {
         openSyncPlantIDB().then((db) => {
