@@ -16,6 +16,13 @@ exports.homepage = async (req, res) => {
  */
 exports.getAllPlantDetails = async (req, res) => {
     try {
+        // Prevent HTTP caching of API responses
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
         // Handle connectivity check requests
         if (req.query.check === 'true') {
             return res.status(200).json({
