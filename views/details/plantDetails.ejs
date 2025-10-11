@@ -8,11 +8,11 @@
         <link rel="stylesheet" href="/css/outputStyles.css" />
         <link rel="manifest" href="/manifest.json"/>
         <script defer>
-            loggedInUser = "<%= username %>";
-            plantId = "<%= Buffer.from(data._id.toString()).toString('base64') %>"; // Base64 encoded plant ID
-            plantOwner = "<%= data.nickname %>";
-            isOfflineMode = <%= typeof isOfflineMode !== 'undefined' && isOfflineMode ? 'true' : 'false' %>;
-            isOfflinePlant = <%= data.isOfflinePlant ? 'true' : 'false' %>;
+            var loggedInUser = "<%= username %>";
+            var plantId = "<%= Buffer.from(data._id.toString()).toString('base64') %>"; // Base64 encoded plant ID
+            var plantOwner = "<%= data.nickname %>";
+            var isOfflineMode = "<%= (typeof isOfflineMode !== 'undefined' && isOfflineMode) ? 'true' : 'false' %>";
+            var isOfflinePlant = "<%= data.isOfflinePlant ? 'true' : 'false' %>";
         </script>
         <% if (typeof isOfflineMode !== 'undefined' && isOfflineMode) { %>
         <!-- Load plant data from IndexedDB for offline plants -->
