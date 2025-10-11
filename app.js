@@ -32,30 +32,38 @@ const addPlantRouter = require('./server/routes/addPlantRouter');
 const plantDetailsRouter = require('./server/routes/plantDetailsRouter');
 const offlineRouter = require('./server/routes/offlineRouter');
 const chatRouter = require('./server/routes/chatRouter');
+const { timeStamp } = require('console');
 
 //Routes
 app.use('/', homepageRouter);
 app.use('/addPlant', addPlantRouter);
-app.use('/offline', offlineRouter);
+app.use('/plantDetails', plantDetailsRouter);
+app.use('/', offlineRouter);
 app.use('/chat', chatRouter);
 
 // API Routes - MUST come before wildcard routes
 app.use('/api/plants', require('./server/routes/addPlantRouter'));
 app.use("/api/chat", chatRouter);
 
-// Plant details routes - MUST come last because it has wildcard routes
-app.use('/plantDetails', plantDetailsRouter);
-
-// Error handling - 404
-app.use((req, res, next) => {
-    res.status(404).render('error/error', { 
-        title: 'Page Not Found',
-        message: 'The page you are looking for does not exist.',
-        error: { status: 404 }
+// Health check route
+app.get('/health', (req, res) => {
+    res.status(200).json({ 
+        status: 'healthy',
+        timestamp: new Date().toISOString(),
+        service: 'Plant Sharing Community',
+        version: "2.0"
     });
 });
 
-// error handling middleware
+// Error handling - 404
+app.use((req, res, next) => {
+    res.status(404).render('error/404-error', { 
+        title: 'Page Not Found',
+        message: 'The page you are looking for does not exist.',
+    });
+});
+
+// Error handling middleware
 app.use((err, req, res, next) => {
     console.error("Error:", err);
     const statusCode = err.status || 500;
@@ -72,6 +80,7 @@ server.listen(PORT, () => {
     console.log(`🌱 Plant Sharing Community server running on port ${PORT}`);
     console.log(`📱 Access at: http://localhost:${PORT}`);
     console.log(`💬 Socket.IO enabled for real-time chat`);
+    console.log(`🏥 Health check: http://localhost:${PORT}/health`);
 });
 
 module.exports = app;
