@@ -1,7 +1,24 @@
-var loggedInUser;
+/**
+ * @fileoverview User authentication and session management.
+ * Handles user login/logout with IndexedDB storage.
+ * Manages user session persistence for PWA offline functionality.
+ * 
+ * Key Features:
+ * - Local user authentication via IndexedDB
+ * - Logout with selective data cleanup
+ * - User session persistence
+ * - Login state verification
+ */
 
+let loggedInUser;
+
+/**
+ * Log out current user and clear user data.
+ * Preserves plant cache for continued offline access.
+ * 
+ * @returns {Promise<void>}
+ */
 function logout() {
-    // In a PWA, we only clear user data, not plant cache
     return deleteAllUsers().then(() => {
         loggedInUser = null;
         onUserLoggedOut();
@@ -12,7 +29,12 @@ function logout() {
     });
 }
 
-// Function to clear all plants from IndexedDB
+/**
+ * Clear all plants from IndexedDB during logout.
+ * Optional cleanup for sync queue - preserves cached plant data.
+ * 
+ * @returns {Promise<void>}
+ */
 function clearAllPlantsFromIndexedDB() {
     return new Promise((resolve, reject) => {
         // Check if the function exists (it should be loaded from addPlantUtility.js)
@@ -34,9 +56,15 @@ function clearAllPlantsFromIndexedDB() {
     });
 }
 
+/**
+ * Log in user and store in IndexedDB.
+ * Clears input field and triggers login callback.
+ * 
+ * @returns {Promise<void>}
+ */
 function logInUser() {
-    var loginInTextField = document.getElementById("userName");
-    var userName = loginInTextField.value;
+    const loginInTextField = document.getElementById("userName");
+    const userName = loginInTextField.value;
     loginInTextField.value = "";
     return addUserToIDB(userName).then(() => {
         loggedInUser = userName;
@@ -44,6 +72,11 @@ function logInUser() {
     });
 }
 
+/**
+ * Check if user is currently logged in via IndexedDB.
+ * 
+ * @returns {Promise<Object|null>} User object or null if not logged in
+ */
 function checkIfUserLoggedIn() {
     return new Promise((resolve, reject) => {
         initializeUserIDB()

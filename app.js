@@ -1,3 +1,14 @@
+/**
+ * @fileoverview Main application entry point for Plant Sharing Community.
+ * Configures Express server with Socket.IO, middleware, routing, and error handling.
+ * Supports real-time chat and offline-first Progressive Web App functionality.
+ * 
+ * @requires express - Web application framework
+ * @requires http - HTTP server for Socket.IO integration
+ * @requires socket.io - Real-time bidirectional event-based communication
+ * @requires dotenv - Environment variable management
+ */
+
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -6,47 +17,55 @@ require('dotenv').config();
 const app = express();
 const server = http.createServer(app);
 
-// Database connection
+// Initialize MongoDB connection
 require('./server/database/database');
 
-// Socket.io setup
+// Initialize Socket.IO for real-time chat functionality
 const io = require('socket.io')(server);
 const socketIOController = require('./server/controllers/socketIOController');
 socketIOController.init(io);
 
-// View engine setup
+// Configure EJS view engine
 app.set('views', path.join(__dirname, 'views'));
 app.set('view engine', 'ejs');
 
-// Middleware
+// Configure middleware
 app.use(express.static(path.join(__dirname, 'public')));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Serve uploaded images
+// Serve user-uploaded plant images
 app.use('/images/uploads', express.static(path.join(__dirname, 'public/images/uploads')));
 
-// Import routers
+// Import application routers
 const homepageRouter = require('./server/routes/homepageRouter');
 const addPlantRouter = require('./server/routes/addPlantRouter');
 const plantDetailsRouter = require('./server/routes/plantDetailsRouter');
 const offlineRouter = require('./server/routes/offlineRouter');
 const chatRouter = require('./server/routes/chatRouter');
-const { timeStamp } = require('console');
 
-//Routes
+// Configure page routes
 app.use('/', homepageRouter);
 app.use('/addPlant', addPlantRouter);
 app.use('/plantDetails', plantDetailsRouter);
 app.use('/', offlineRouter);
 app.use('/chat', chatRouter);
 
-// API Routes - MUST come before wildcard routes
+// Configure API routes
 app.use('/api/plants', require('./server/routes/addPlantRouter'));
 app.use("/api/chat", chatRouter);
 
-// Health check route
+/**
+ * Health check endpoint for connectivity monitoring.
+ * Supports both HEAD and GET methods for efficient network status verification.
+ * @route GET /health
+ * @returns {Object} 200 - Server health status with timestamp and version
+ */
 app.get('/health', (req, res) => {
+    if (req.method === 'HEAD') {
+        return res.status(200).end();
+    }
+    
     res.status(200).json({ 
         status: 'healthy',
         timestamp: new Date().toISOString(),
@@ -55,7 +74,10 @@ app.get('/health', (req, res) => {
     });
 });
 
-// Error handling - 404
+/**
+ * 404 error handler - catches all undefined routes.
+ * Renders custom 404 error page for better user experience.
+ */
 app.use((req, res, next) => {
     res.status(404).render('error/404-error', { 
         title: 'Page Not Found',
@@ -63,7 +85,11 @@ app.use((req, res, next) => {
     });
 });
 
-// Error handling middleware
+/**
+ * Global error handler middleware.
+ * Logs errors and returns appropriate JSON response.
+ * Stack traces are only shown in development environment.
+ */
 app.use((err, req, res, next) => {
     console.error("Error:", err);
     const statusCode = err.status || 500;
@@ -74,7 +100,7 @@ app.use((err, req, res, next) => {
     });
 });
 
-// Start the server
+// Start server and listen on configured port
 const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
     console.log(`🌱 Plant Sharing Community server running on port ${PORT}`);

@@ -1,16 +1,34 @@
+/**
+ * @fileoverview Socket.IO controller for real-time chat functionality.
+ * Manages WebSocket connections, chat rooms per plant, and user presence tracking.
+ * Implements plant-specific chat rooms with join/leave notifications.
+ * 
+ * @requires socket.io - Real-time bidirectional event-based communication
+ */
+
+/**
+ * Initialize Socket.IO event handlers.
+ * Sets up connection, room management, chat messaging, and disconnection handlers.
+ * 
+ * @param {Object} io - Socket.IO server instance
+ */
 exports.init = function (io) {
-    let roomUserCounts = {}; // Track user count per plant/room
+    let roomUserCounts = {};
 
     io.sockets.on('connection', function (socket) {
         try {
+            /**
+             * Handle user joining a plant-specific chat room.
+             * @event createorjoin
+             * @param {string} plantID - Plant ID (used as room identifier)
+             * @param {string} userID - User nickname
+             */
             socket.on('createorjoin', function (plantID, userID) {
                 socket.join(plantID);
                 
-                // Store plantID on socket for later use
                 socket.plantID = plantID;
                 socket.userID = userID;
                 
-                // Increment user count for this plant room
                 if (!roomUserCounts[plantID]) {
                     roomUserCounts[plantID] = 0;
                 }
@@ -24,11 +42,20 @@ exports.init = function (io) {
                     .emit('joined', plantID, userID, roomUserCounts[plantID]);
             });
 
+            /**
+             * Handle incoming chat messages and broadcast to room.
+             * @event chat
+             * @param {Object} message - Chat message object with plantId, userID, text, timestamp
+             */
             socket.on('chat', function (message) {
                 console.log('Chat message in room ' + message.plantId + ':', message);
                 io.sockets.to(message.plantId).emit('chatmessage', message);
             });
 
+            /**
+             * Handle user disconnection and room cleanup.
+             * @event disconnect
+             */
             socket.on('disconnect', function () {
                 const plantID = socket.plantID;
                 const userID = socket.userID;
@@ -39,7 +66,6 @@ exports.init = function (io) {
                     console.log('User ' + userID + ' disconnected from plant room ' + plantID + 
                         '. Total users: ' + roomUserCounts[plantID]);
                     
-                    // Clean up if no users left
                     if (roomUserCounts[plantID] <= 0) {
                         delete roomUserCounts[plantID];
                     }

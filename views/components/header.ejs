@@ -1,11 +1,41 @@
+<%#
+/**
+ * @component Header
+ * @description Global header component with PWA installation support
+ * 
+ * Features:
+ * - PWA installation prompt
+ * - Service worker registration
+ * - Responsive layout
+ * - User welcome message
+ * - App logo and branding
+ * - Logout functionality
+ * - iOS-specific PWA meta tags
+ * 
+ * Elements:
+ * - Logo image
+ * - App title
+ * - Install PWA button (conditionally shown)
+ * - Welcome message with username
+ * - Logout button
+ * 
+ * Required:
+ * - manifest.json for PWA
+ * - Service worker script
+ * - User authentication scripts
+ */
+%>
+
 <!-- Global meta tags added for PWA compatibility -->
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <meta name="theme-color" content="#4CAF50">
 <link rel="manifest" href="/manifest.json">
+
 <!-- iOS PWA meta tags -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="PlantPal">
+
 <!-- iOS icon links -->
 <link rel="apple-touch-icon" href="/images/icon-192.png">
 <link rel="apple-touch-icon" sizes="512x512" href="/images/icon-512.png">
@@ -15,7 +45,7 @@
 <link rel="apple-touch-icon" sizes="72x72" href="/images/icon-72.png">
 <link rel="apple-touch-icon" sizes="48x48" href="/images/icon-48.png">
 <script>
-    // Register service worker for all pages
+    // Register service worker 
     if ("serviceWorker" in navigator) {
         window.addEventListener('load', () => {
             navigator.serviceWorker.register("/serviceWorker.js", {
@@ -39,12 +69,11 @@
         });
     }
     
-    // PWA installation logic
+    // PWA installation 
     let deferredPrompt;
     const installButton = document.getElementById('installPWA');
     
     window.addEventListener('beforeinstallprompt', (e) => {
-        // Prevent Chrome 67 and earlier from automatically showing the prompt
         e.preventDefault();
         // Stash the event so it can be triggered later
         deferredPrompt = e;
@@ -52,7 +81,6 @@
         installButton.classList.remove('hidden');
         
         installButton.addEventListener('click', (e) => {
-            // Show the install prompt
             deferredPrompt.prompt();
             // Wait for the user to respond to the prompt
             deferredPrompt.userChoice.then((choiceResult) => {
@@ -81,7 +109,7 @@
         <h1 class="text-lg sm:text-2xl font-bold text-neutral" id="headerTitle">PlantPal</h1>
     </div>
     
-    <!-- Install PWA Button - Hidden by default, shown when installation is possible -->
+    <!-- Install PWA Button -->
     <button id="installPWA" class="btn btn-sm btn-primary hidden mx-2">
         Install App <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="ml-2" viewBox="0 0 16 16">
             <path d="M.5 9.9a.5.5 0 0 1 .5.5v2.5a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2.5a.5.5 0 0 1 1 0v2.5a2 2 0 0 1-2 2H2a2 2 0 0 1-2-2v-2.5a.5.5 0 0 1 .5-.5z"/>

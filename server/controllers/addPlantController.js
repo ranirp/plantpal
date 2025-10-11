@@ -1,23 +1,28 @@
 /**
- * @fileoverview Controller for adding a new plant to the database.
- * Handles the logic for processing the request data and saving the plant using the AddPlant model.
+ * @fileoverview Plant management controller.
+ * Handles plant creation, retrieval, validation, and rate limiting.
+ * Implements in-memory rate limiting to prevent spam submissions.
+ * 
+ * @requires ../models/addPlantModel - Plant database model
  */
 
 const AddPlant = require('../models/addPlantModel');
 
-// Simple in-memory rate limiting (for production, use Redis or a proper rate limiter)
 const submissionTracker = new Map();
-const RATE_LIMIT_WINDOW = 10000; // 10 seconds (reduced from 30)
-const MAX_SUBMISSIONS = 3; // 3 submissions per 10 seconds per IP (increased from 1)
+const RATE_LIMIT_WINDOW = 10000;
+const MAX_SUBMISSIONS = 3;
 
 /**
- * Check if IP is rate limited
+ * Check if an IP address has exceeded the rate limit.
+ * Cleans up old submissions outside the time window.
+ * 
+ * @param {string} ip - Client IP address
+ * @returns {boolean} True if rate limited, false otherwise
  */
 function isRateLimited(ip) {
     const now = Date.now();
     const userSubmissions = submissionTracker.get(ip) || [];
     
-    // Clean old submissions
     const recentSubmissions = userSubmissions.filter(time => now - time < RATE_LIMIT_WINDOW);
     submissionTracker.set(ip, recentSubmissions);
     
@@ -25,7 +30,9 @@ function isRateLimited(ip) {
 }
 
 /**
- * Record a submission
+ * Record a new submission timestamp for rate limiting.
+ * 
+ * @param {string} ip - Client IP address
  */
 function recordSubmission(ip) {
     const now = Date.now();
@@ -35,7 +42,11 @@ function recordSubmission(ip) {
 }
 
 /**
- * Renders the add plant page
+ * Render the add plant form page.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
  */
 exports.addPlantPage = (req, res, next) => {
     res.render("addPlant/addPlant", { 
@@ -44,9 +55,23 @@ exports.addPlantPage = (req, res, next) => {
 };
 
 /**
- * Adds a new plant to the database
- * Required fields: plantName, type, description, nickname
- * Optional field: photo (filename of the uploaded image)
+ * Create and save a new plant to the database.
+ * Validates required fields, plant type, and enforces rate limiting.
+ * Handles optional photo upload via Multer middleware.
+ * 
+ * @param {Object} req - Express request object
+ * @param {Object} req.body - Request body containing plant data
+ * @param {string} req.body.plantName - Name of the plant
+ * @param {string} req.body.type - Plant type (must be from valid enum)
+ * @param {string} req.body.description - Plant description
+ * @param {string} req.body.nickname - User nickname
+ * @param {Object} req.file - Uploaded file object from Multer (optional)
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Object} 201 - Created plant object
+ * @returns {Object} 400 - Validation error
+ * @returns {Object} 429 - Rate limit exceeded
+ * @returns {Object} 500 - Server error
  */
 exports.addNewPlantToDB = async (req, res, next) => {
     try {

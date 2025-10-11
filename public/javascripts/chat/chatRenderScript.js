@@ -1,12 +1,28 @@
-// Chat rendering utilities for client-side - Facebook Messenger Style
+/**
+ * @fileoverview Chat message rendering utilities.
+ * Creates styled message bubbles with avatars, timestamps, and alignment.
+ * Differentiates between own messages (right-aligned) and others (left-aligned).
+ * 
+ * Key Features:
+ * - Avatar generation with user initials
+ * - Message alignment based on ownership
+ * - Timestamp formatting
+ * - Color-coded message bubbles
+ * - Responsive design with Tailwind classes
+ */
 
+/**
+ * Create styled chat message element with avatar and formatting.
+ * Right-aligns user's own messages, left-aligns others' messages.
+ * 
+ * @param {Object} message - Message object with username, text, timestamp
+ * @returns {HTMLElement} Formatted message div element
+ */
 function createChatMessageDiv(message) {
     console.log("Creating message div with:", message);
     const chatContainer = document.createElement("div");
     
-    // Ensure we have the username in a consistent format
     const username = message.username || message.userName || 'Unknown';
-    // Compare properly to loggedInUser
     const isOwnMessage = username === loggedInUser;
     
     console.log("Message from:", username, "logged in user:", loggedInUser, "is own:", isOwnMessage);
@@ -30,12 +46,12 @@ function createChatMessageDiv(message) {
 
     // Set colors based on message ownership
     if (isOwnMessage) {
-        avatarInner.style.backgroundColor = "#8b5cf6"; // purple-600
-        avatarText.style.color = "#ffffff"; // white text
+        avatarInner.style.backgroundColor = "#8b5cf6"; 
+        avatarText.style.color = "#ffffff"; 
     } else {
-        avatarInner.style.backgroundColor = "#f3f4f6"; // gray-100
-        avatarText.style.color = "#4b5563"; // gray-600 text
-        avatarInner.style.border = "2px solid #9ca3af"; // gray-400 border
+        avatarInner.style.backgroundColor = "#f3f4f6"; 
+        avatarText.style.color = "#4b5563"; 
+        avatarInner.style.border = "2px solid #9ca3af"; 
     }
 
     avatarInner.appendChild(avatarText);
@@ -58,14 +74,14 @@ function createChatMessageDiv(message) {
         messageBubble.style.background = "#e5e7eb";
     }
     
-    // Add message text - check all possible property names
+    // Add message text 
     const messageText = document.createElement("span");
     const textContent = message.chatmessage || message.chatMessage || message.message || '';
     console.log("Message content:", textContent);
     messageText.textContent = textContent;
     messageBubble.appendChild(messageText);
     
-    // Create user info (only show for others' messages or when sender changes)
+    // Create user info 
     if (!isOwnMessage) {
         const userInfo = document.createElement("div");
         userInfo.classList.add("text-xs", "text-gray-500", "mb-1", "ml-1", "font-medium");
@@ -94,7 +110,7 @@ function createChatMessageDiv(message) {
     return chatContainer;
 }
 
-// Legacy function for compatibility - now uses new createChatMessageDiv
+// Legacy function for compatibility 
 function createChatBubble(message) {
     const chatBubbleDiv = document.createElement("div");
     chatBubbleDiv.classList.add("chat-bubble", "shadow", 'rounded-2xl');

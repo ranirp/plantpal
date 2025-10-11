@@ -1,4 +1,10 @@
-/** @type {import('tailwindcss').Config} */
+/**
+ * @fileoverview Tailwind CSS configuration for Plant Sharing Community.
+ * Configures content scanning paths, dark mode, and DaisyUI plugin.
+ * Uses 'cupcake' theme for consistent, pleasant color palette.
+ * 
+ * @type {import('tailwindcss').Config}
+ */
 module.exports = {
     content: [
         "./views/**/*.ejs",

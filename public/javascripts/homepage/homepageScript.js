@@ -1,9 +1,25 @@
-// Store the list of plants
-let plantLists = []; // Variable to store the list of plants
-let currentFilter = 'all'; // Current filter type
-let currentSort = 'date'; // Current sort method
+/**
+ * @fileoverview Homepage main script for Plant Sharing Community.
+ * Manages plant list display, filtering, sorting, online/offline synchronization,
+ * and user authentication. Implements offline-first architecture with IndexedDB.
+ * 
+ * Key Features:
+ * - Automatic online/offline detection and sync
+ * - Plant filtering by type (succulent, fern, houseplant, etc.)
+ * - Sorting by date or name
+ * - IndexedDB caching for offline access
+ * - Background sync queue management
+ * - Real-time connectivity monitoring
+ */
 
-// Update the UI counter that shows number of items queued for sync
+let plantLists = [];
+let currentFilter = 'all';
+let currentSort = 'date';
+
+/**
+ * Update the sync queue counter badge in the UI.
+ * Displays number of plants pending upload when back online.
+ */
 async function updateQueueCounter() {
     try {
         const syncDB = await openSyncPlantIDB();
@@ -20,17 +36,26 @@ async function updateQueueCounter() {
     }
 }
 
-// Function to navigate to the plant details page
+/**
+ * Navigate to plant details page.
+ * @param {string} id - Plant ID (database ID or offline ID)
+ */
 function showDetailsPage(id) {
     window.location.href = "/plantDetails/" + id + "/" + loggedInUser;
 }
 
-// Function to navigate to add plant page
+/**
+ * Navigate to add plant form page.
+ */
 function openAddPlantPage() {
     window.location.href = "/addPlant";
 }
 
-// Function to initialize the application
+/**
+ * Initialize homepage application.
+ * Sets up service worker, sync listeners, connectivity monitoring,
+ * and loads initial plant data from server or IndexedDB cache.
+ */
 async function init() {
     console.log("═══════════════════════════════════════════");
     console.log("🚀 INIT FUNCTION CALLED - STARTING APP");
@@ -40,47 +65,41 @@ async function init() {
     
     checkIfUserLoggedIn(); // Check if user is logged in
 
-    // Service worker registration moved to header.ejs for site-wide availability
-
     // Setup sync event listener first, before any sync operations
     listenForOnlineSync();
     
-    // Then proceed with initial sync/fetch based on network status
     if (navigator.onLine) {
         console.log("🌐 Online mode detected at init - checking for server connectivity");
-        // Verify actual server connectivity before proceeding
         if (typeof checkServerConnectivity === 'function') {
             const isActuallyOnline = await checkServerConnectivity();
             if (isActuallyOnline) {
                 console.log("🌐 Server connectivity confirmed - proceeding with online init");
-                // ALWAYS sync pending plants first if any exist
                 await checkIfThereIsSyncPlantAndUpdate();
-                
-                // ALWAYS fetch fresh data from server when online
-                // This ensures the UI shows the latest plants, not stale cache
                 getPlantsFromServer();
             } else {
                 console.log("⚠️ No server connectivity despite navigator.onLine=true - using offline mode");
                 getPlantsFromIDB();
             }
         } else {
-            // No connectivity check available; attempt online flow
             console.log("⚠️ No connectivity check function available - proceeding with online init");
             await checkIfThereIsSyncPlantAndUpdate();
             getPlantsFromServer();
         }
     } else {
         console.log("📴 Offline mode detected at init - using local data");
-        // Only use IndexedDB cache when truly offline
         getPlantsFromIDB();
     }
 
-    // Update queue counter on init (handles offline cached items)
     await updateQueueCounter();
-    // Function to check for offline-synced plants and update them is defined at top-level
 }    
 
-// Function to check for offline-synced plants and update them (top-level so other handlers can call it)
+/**
+ * Check for and process any pending plant sync operations.
+ * Synchronizes offline-created plants with server when back online.
+ * Updates UI and clears sync queue on successful sync.
+ * 
+ * @returns {Promise<boolean>} True if plants were synced, false if no sync needed
+ */
 async function checkIfThereIsSyncPlantAndUpdate() {
     console.log("═══════════════════════════════════════════");
     console.log(`🔄 SYNC CHECK STARTED - ${new Date().toISOString()}`);
@@ -88,13 +107,11 @@ async function checkIfThereIsSyncPlantAndUpdate() {
     return new Promise(async (resolve) => {
         let isTherePlantsToSync = false;
         try {
-            // Open the raw sync DB so we can access numeric keys (id)
             const db = await openSyncPlantIDB();
             const syncEntries = await getAllSyncPlants(db);
 
             console.log(`📦 Found ${syncEntries.length} total items in IndexedDB`);
 
-            // syncEntries are objects from the store and look like { id, value }
             for (const entry of syncEntries) {
                 const plant = entry.value || entry;
                 const localId = entry.id;
@@ -105,7 +122,6 @@ async function checkIfThereIsSyncPlantAndUpdate() {
                 
                 if (needsSync && navigator.onLine) {
                     console.log(`📤 Syncing plant ${localId}: ${plant.plantName}`);
-                    // pass the local store id so it can be updated in-place after sync
                     await addPlantToMongoDB(plant, localId);
                     isTherePlantsToSync = true;
                 } else {
@@ -143,10 +159,8 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                 console.log("📷 Uploading photo with plant:", plantDetails.photo.name || 'blob');
                 formData.append("photo", plantDetails.photo);
             } else if (typeof plantDetails.photo === 'string') {
-                // Photo is already uploaded (string filename)
                 formData.append("photo", plantDetails.photo);
             } else if (typeof plantDetails.photo === 'object' && plantDetails.photo.name) {
-                // Metadata only - file was lost (shouldn't happen with new approach)
                 console.warn("⚠️  Photo metadata found but no actual file. Photo will not be uploaded:", plantDetails.photo.name);
             }
         }
@@ -184,23 +198,18 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
             let serverId = null;
             
             if (responseData && responseData.plant && responseData.plant._id) {
-                // Standard response format with nested plant object
                 serverId = responseData.plant._id;
                 console.log("✅ Found server ID in response.plant._id:", serverId);
             } else if (responseData && responseData._id) {
-                // Alternative format where plant data is directly in response
                 serverId = responseData._id;
                 console.log("✅ Found server ID in response._id:", serverId);
             } else if (responseData && responseData.id) {
-                // Another possible format
                 serverId = responseData.id;
                 console.log("✅ Found server ID in response.id:", serverId);
             } else if (responseData && responseData.plantId) {
-                // Another possible format
                 serverId = responseData.plantId;
                 console.log("✅ Found server ID in response.plantId:", serverId);
             } else {
-                // If no server ID found, create a temporary ID to allow handling
                 serverId = `offline_${plantId || Date.now()}`;
                 console.warn("⚠️ No server ID found in response. Using temporary ID:", serverId);
             }
@@ -223,8 +232,6 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                         }
 
                         const existingPlant = record.value || record;
-                        // If successfully synced, REMOVE from sync queue completely
-                        // The plant will be fetched fresh from server and cached separately
                         if (serverId) {
                             const deleteReq = store.delete(plantId);
                             deleteReq.addEventListener('success', async () => {
@@ -239,7 +246,6 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                             });
                             deleteReq.addEventListener('error', (ev) => {
                                 console.error('❌ Error deleting synced plant from queue:', ev.target.error);
-                                // Still resolve - sync was successful
                                 resolve();
                             });
                         } else {
@@ -296,21 +302,19 @@ async function getPlantsFromServer() {
         // Add cache-busting parameter to ensure fresh data
         const cacheBuster = Date.now();
         const response = await fetch(`/api/plants/getAllPlants?sortBy=createdAt&order=desc&_=${cacheBuster}`, {
-            cache: 'no-store' // Prevent browser HTTP caching
+            cache: 'no-store' 
         });
         console.log("📡 Server response status:", response.status, response.ok);
         
         if (response.ok) {
             const data = await response.json();
-            plantLists = data.plants || data; // Handle both array and object responses
+            plantLists = data.plants || data; 
             console.log("✅ Plants fetched from server successfully!");
             console.log("📊 Number of plants received:", plantLists.length);
             console.log("🌱 Plants data:", plantLists);
             
-            // CRITICAL: Render immediately so user sees data
             applyFilterAndSort();
             
-            // Cache in background (don't block UI)
             addAllPlantsToIDB(plantLists);
         } else {
             console.error("❌ Failed to fetch plants. Status:", response.status);
@@ -318,7 +322,6 @@ async function getPlantsFromServer() {
         }
     } catch (error) {
         console.error("❌ Error fetching plants from server:", error.message);
-        // Try to load from cache as fallback
         console.log("📦 Attempting to load from IndexedDB cache as fallback...");
         await getPlantsFromIDB();
     }

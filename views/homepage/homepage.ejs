@@ -1,3 +1,24 @@
+<%#
+/**
+ * @template Homepage
+ * @description Main landing page template for PlantPal application
+ * 
+ * Features:
+ * - Responsive grid layout for plant cards
+ * - Filter controls for plant types
+ * - Sort options (date, type, name)
+ * - Add plant button
+ * - PWA support with service worker
+ * - Offline functionality
+ * 
+ * Required Scripts:
+ * - connectivityCheck.js - Network status monitoring
+ * - userIDBUtility.js - User data storage
+ * - homepageScript.js - Main homepage logic
+ * - homepageRenderScript.js - Plant list rendering
+ */
+%>
+
 <!DOCTYPE html>
 <html lang="en" data-theme="cupcake">
 <head>
@@ -7,6 +28,7 @@
     <title>PlantPal - Homepage</title>
     <link rel="stylesheet" href="/css/outputStyles.css" />
     <link rel="manifest" href="/manifest.json" />
+
     <!-- PWA icons -->
     <link rel="apple-touch-icon" href="/images/icon-192.png">
     <link rel="apple-touch-icon" sizes="512x512" href="/images/icon-512.png">
@@ -14,6 +36,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="PlantPal">
+    
     <!-- Scripts -->
     <script src="/javascripts/utils/connectivityCheck.js" defer></script>
     <script src="/javascripts/user/userIDBUtility.js" defer></script>

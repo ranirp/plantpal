@@ -1,5 +1,36 @@
+<%#
+/**
+ * @component PlantDetailsComponent
+ * @description Displays detailed information about a specific plant
+ * 
+ * Features:
+ * - Full-size plant image with fallback
+ * - Plant metadata display (name, type, owner, date)
+ * - Description section
+ * - Back navigation button
+ * - Responsive layout
+ * 
+ * Required Data:
+ * @param {Object} data - Plant data object
+ * @param {string} data.photo - Photo filename
+ * @param {string} data.plantName - Name of the plant
+ * @param {string} data.nickname - Owner's nickname
+ * @param {string} data.type - Plant type (succulent, fern, etc.)
+ * @param {Date} data.createdAt - Creation timestamp
+ * @param {string} data.description - Plant description
+ * 
+ * Styling:
+ * - Glass card effect
+ * - Shadow effects
+ * - Responsive image sizing
+ * - Consistent spacing
+ */
+%>
+
 <div class="card w-full glass h-full">
+    <%# Stats container with back button %>
     <div class="stats shadow h-full relative">
+        <%# Back navigation button %>
         <div
             class="absolute top-2 left-2 btn btn-circle btn-neutral"
             onclick="window.history.back();"
@@ -9,7 +40,9 @@
         </svg>
     </div>
 
+    <%# Plant image container with size constraints %>
     <figure class="max-h-96 overflow-hidden">
+        <%# Responsive plant image with fallback to placeholder %>
         <img 
             src="/images/uploads/<%= data.photo %>" 
             alt="<%= data.plantName %>" 
@@ -19,9 +52,12 @@
     </figure>
     </div>
 
+    <%# Plant details content section %>
     <div class="card-body p-5 m-0 h-full">
+        <%# Plant name header %>
         <h2 class="card-title text-2xl"><%= data.plantName %></h2>
 
+        <%# Owner information %>
         <div class="card overscroll-none">
             <div class="overscroll-none flex flex-row flex-nowrap">
                 <div class="mr-2 font-bold">Created by:</div>
@@ -29,6 +65,7 @@
             </div>
         </div>
 
+        <%# Plant type display %>
         <div class="card overscroll-none">
             <div class="overscroll-none flex flex-row flex-nowrap">
                 <div class="mr-2 font-bold">Type:</div>
@@ -36,6 +73,7 @@
             </div>
         </div>
 
+        <%# Creation timestamp with formatted date %>
         <div class="card overscroll-none">
             <div class="overscroll-none flex flex-row flex-nowrap">
                 <div class="mr-2 font-bold">Added:</div>
@@ -49,8 +87,10 @@
             </div>
         </div>
 
+        <%# Visual divider %>
         <div class="divider"></div>
 
+        <%# Plant description section %>
         <div class="card overscroll-none">
             <div class="font-bold mb-2">Description:</div>
             <div class="bg-base-100 p-3 rounded-lg">

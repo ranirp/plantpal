@@ -1,17 +1,33 @@
-// Constants for chat and chat messages
+/**
+ * @fileoverview Chat message IndexedDB utilities.
+ * Manages chat message persistence, caching, and sync queue for offline chat.
+ * Implements three stores: chatMessages (active), chats (sync queue), chatCache (offline viewing).
+ * 
+ * Key Features:
+ * - Message persistence for offline viewing
+ * - Sync queue for offline message sending
+ * - Plant-specific chat caching
+ * - Automatic cache updates
+ * - Last updated timestamp tracking
+ */
+
 const CHAT_IDB_NAME = "chatIDB";
 const CHAT_IDB_STORE = "chatMessages";
 const SYNC_CHAT_STORE_NAME = "chats";
-const CHAT_CACHE_STORE_NAME = "chatCache"; // New store for caching chat messages by plant
+const CHAT_CACHE_STORE_NAME = "chatCache"; 
 const SYNC_CHAT_EVENT = "chat";
 
-// Initialize chat database with all necessary object stores
+/**
+ * Initialize chat IndexedDB with required object stores.
+ * Creates stores for active messages, sync queue, and cache.
+ * 
+ * @returns {Promise<IDBDatabase>} Opened database instance
+ */
 function initChatDatabase() {
     return new Promise((resolve, reject) => {
         console.log("Initializing chat database...");
         
-        const request = indexedDB.open(CHAT_IDB_NAME, 2); // Version 2 to add new store
-        
+        const request = indexedDB.open(CHAT_IDB_NAME, 2); 
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
             
@@ -52,7 +68,13 @@ function initChatDatabase() {
     });
 }
 
-// Ensure database is initialized before use
+/**
+ * Get singleton database connection.
+ * Ensures only one database connection is created and reused.
+ * Lazy initializes database on first call.
+ * 
+ * @returns {Promise<IDBDatabase>} Database connection promise
+ */
 let dbPromise = null;
 function getChatDatabase() {
     if (!dbPromise) {
@@ -61,8 +83,17 @@ function getChatDatabase() {
     return dbPromise;
 }
 
+/**
+ * Add a new chat message to the sync queue for offline persistence.
+ * Creates a transaction to store the message and retrieves the stored entry.
+ * 
+ * @param {IDBDatabase} syncChatTDB - Database connection
+ * @param {Object} message - Chat message to store
+ * @returns {Promise<Object>} Stored message with assigned ID
+ */
 const addNewChatToSync = (syncChatTDB, message) => {
     return new Promise((resolve, reject) => {
+        // Start a readwrite transaction on the sync store
         const transaction = syncChatTDB.transaction([SYNC_CHAT_STORE_NAME], "readwrite");
         const chatStore = transaction.objectStore(SYNC_CHAT_STORE_NAME);
         const addRequest = chatStore.add({ value: message });

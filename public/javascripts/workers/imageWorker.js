@@ -1,4 +1,16 @@
-// Web worker for image processing and compression
+/**
+ * @fileoverview Web Worker for client-side image processing.
+ * Handles image validation, compression, and thumbnail generation off the main thread.
+ * Uses OffscreenCanvas for efficient image manipulation without blocking UI.
+ * 
+ * Supported Operations:
+ * - COMPRESS_IMAGE: Resize and compress images to reduce file size
+ * - VALIDATE_IMAGE: Check file type and size constraints
+ * - GENERAL_THUMBNAIL: Generate thumbnail previews
+ * 
+ * @requires OffscreenCanvas - For canvas operations in worker context
+ */
+
 self.addEventListener('message', function (e) {
     const { type , data } = e.data;
 
@@ -21,7 +33,13 @@ self.addEventListener('message', function (e) {
 });
 
 /**
- * Compress image to reduce file size
+ * Compress and resize image using OffscreenCanvas.
+ * Maintains aspect ratio and converts to JPEG format.
+ * 
+ * @param {File} file - Image file to compress
+ * @param {number} maxWidth - Maximum width (default: 800px)
+ * @param {number} maxHeight - Maximum height (default: 600px)
+ * @param {number} quality - JPEG quality 0-1 (default: 0.8)
  */
 function compressImage(file, maxWidth = 800, maxHeight = 600, quality=0.8) {
     const reader = new FileReader();
@@ -84,7 +102,10 @@ function compressImage(file, maxWidth = 800, maxHeight = 600, quality=0.8) {
 }
 
 /**
- * Validate image file type and size
+ * Validate image file type and size constraints.
+ * Checks against allowed types and 5MB maximum size.
+ * 
+ * @param {Object} file - File metadata object {type, size, name}
  */
 function validateImage(file) {
     const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];

@@ -1,17 +1,26 @@
 /**
- * Plant Details Client-Side Handler
- * Handles loading plant details from IndexedDB or server
- * and manages chart data storage and synchronization
+ * @fileoverview Plant details page handler with offline support.
+ * Manages plant detail loading from server or IndexedDB cache.
+ * Stores chart data and plant information for offline viewing.
+ * 
+ * Key Features:
+ * - Plant detail caching for offline access
+ * - Chart data persistence
+ * - Ownership verification
+ * - Automatic cache updates on access
+ * - Fallback to cached data when offline
  */
 
-// IndexedDB database name and version
 const PLANT_DETAILS_DB_NAME = 'PlantDetailsDB';
 const PLANT_DETAILS_DB_VERSION = 1;
 
 let plantDetailsDB = null;
 
 /**
- * Initialize IndexedDB for plant details and charts
+ * Initialize IndexedDB for plant details and chart data.
+ * Creates object stores for charts and plant details cache.
+ * 
+ * @returns {Promise<IDBDatabase>} Opened database instance
  */
 async function initPlantDetailsDB() {
     return new Promise((resolve, reject) => {

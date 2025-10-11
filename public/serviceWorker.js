@@ -1,12 +1,32 @@
-const CACHE_NAME = 'plantpal-cache-v10'; // Incremented version to ensure refresh
+/**
+ * @fileoverview Service Worker for Plant Sharing Community PWA.
+ * Implements offline-first caching strategy with cache-first for static assets
+ * and network-first for dynamic API content. Enables offline functionality.
+ * 
+ * Cache Strategy:
+ * - Static assets (HTML, CSS, JS, images): Cache-first with network fallback
+ * - API endpoints: Network-first with cache fallback
+ * - Automatic cache cleanup on activation
+ * 
+ * @version 10
+ */
+
+const CACHE_NAME = 'plantpal-cache-v10';
 
 console.log("Service Worker: Registered");
 
+/**
+ * Log helper function with service worker prefix.
+ * @param {string} message - Message to log
+ */
 function log(message) {
     console.log("Service Worker: " + message);
 }
 
-// Use the install event to pre-cache all initial resources
+/**
+ * Install event - pre-cache essential app resources.
+ * Caches all static assets needed for offline operation.
+ */
 self.addEventListener("install", (event) => {
     log("Service Worker: Installing....");
     event.waitUntil(
@@ -85,7 +105,10 @@ self.addEventListener("install", (event) => {
     );
 });
 
-// Activate event - clean up old caches
+/**
+ * Activate event - clean up old cache versions.
+ * Removes outdated caches when new service worker takes control.
+ */
 self.addEventListener("activate", (event) => {
     log("Service Worker: Activating...");
     event.waitUntil(
@@ -102,8 +125,14 @@ self.addEventListener("activate", (event) => {
     );
 });
 
-// Fetch event - intelligent caching strategy
+/**
+ * Fetch event - implements intelligent caching strategy:
+ * - API calls: Network-first with offline fallback
+ * - Navigation (HTML): Network-first with home fallback
+ * - Static assets: Cache-first with network fallback
+ */
 self.addEventListener("fetch", function (event) {
+    // Parse request URL for routing decisions
     const url = new URL(event.request.url);
     
     // Only handle GET requests for caching
@@ -131,7 +160,7 @@ self.addEventListener("fetch", function (event) {
                             JSON.stringify({ 
                                 success: true,
                                 message: "Offline mode: use cached messages", 
-                                messages: []  // Empty array - client will use cached messages
+                                messages: []  // Empty array 
                             }),
                             {
                                 status: 200,
@@ -202,7 +231,7 @@ self.addEventListener("fetch", function (event) {
                     // Return cached version immediately
                     log("Serving from cache: " + url.pathname);
                     
-                    // Optionally update cache in background (stale-while-revalidate)
+                    // Optionally update cache in background 
                     if (navigator.onLine) {
                         fetch(event.request)
                             .then((networkResponse) => {

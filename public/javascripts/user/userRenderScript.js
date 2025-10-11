@@ -1,3 +1,19 @@
+/**
+ * @fileoverview User UI rendering utilities.
+ * Manages login modal, logout button, and welcome message display.
+ * Handles UI state changes based on user authentication status.
+ * 
+ * Key Features:
+ * - Login modal management
+ * - Logout button visibility toggle
+ * - Welcome message with capitalized username
+ * - UI synchronization with auth state
+ */
+
+/**
+ * Handle user logout UI changes.
+ * Shows login modal and hides authenticated UI elements.
+ */
 function onUserLoggedOut() {
     const loginUserModel = document.getElementById("loginUserModel");
     if (loginUserModel) {
@@ -7,6 +23,10 @@ function onUserLoggedOut() {
     toggleWelcomeText(false);
 }
 
+/**
+ * Handle user login UI changes.
+ * Closes login modal and shows authenticated UI elements.
+ */
 function onUserLoggedIn() {
     const loginUserModel = document.getElementById("loginUserModel");
     if (loginUserModel) {
@@ -16,6 +36,10 @@ function onUserLoggedIn() {
     toggleWelcomeText(true);
 }
 
+/**
+ * Toggle logout button visibility.
+ * @param {boolean} shouldShow - Whether to show the button
+ */
 function toggleLogoutButton(shouldShow) {
     const logoutButton = document.getElementById("logoutButton");
     if (logoutButton) {
@@ -23,6 +47,11 @@ function toggleLogoutButton(shouldShow) {
     }
 }
 
+/**
+ * Toggle welcome text visibility and update with username.
+ * Capitalizes first letter of username for display.
+ * @param {boolean} shouldShow - Whether to show the welcome text
+ */
 function toggleWelcomeText(shouldShow) {
     const userWelcomeText = document.getElementById("welcomeUserText");
     if (userWelcomeText) {

@@ -1,12 +1,21 @@
-// Import necessary modules and controllers
-var express = require('express');
+/**
+ * @fileoverview Homepage router configuration.
+ * Defines routes for rendering the main homepage view.
+ * 
+ * @requires express - Web application framework
+ * @requires ../controllers/homepageController - Homepage request handlers
+ */
+
+const express = require('express');
 const { homepage } = require('../controllers/homepageController');
 
-// Create a router instance
-var router = express.Router();
+const router = express.Router();
 
-// Route to render the homepage with all plants
+/**
+ * GET / - Render homepage
+ * @route GET /
+ * @returns {HTML} Rendered homepage view
+ */
 router.get('/', homepage);
 
-// Export the router 
 module.exports = router;

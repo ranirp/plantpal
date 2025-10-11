@@ -1,3 +1,30 @@
+<%#
+/**
+ * @template PlantDetails
+ * @description Combined plant details and chat interface
+ * 
+ * Features:
+ * - Split-screen layout (details + chat)
+ * - Offline plant data support
+ * - Real-time chat integration
+ * - Responsive design
+ * - Online/offline mode indicator
+ * 
+ * Required Data:
+ * @param {Object} data - Plant details
+ * @param {string} data._id - Plant ID
+ * @param {string} data.nickname - Plant owner's nickname
+ * @param {boolean} isOfflineMode - Whether app is in offline mode
+ * @param {boolean} data.isOfflinePlant - Whether plant was created offline
+ * @param {string} username - Current user's username
+ * 
+ * Components:
+ * - plantDetailsComponent.ejs - Plant information display
+ * - chat.ejs - Chat interface
+ * - onlineOfflineMode.ejs - Connection status indicator
+ */
+%>
+
 <!DOCTYPE html>
 <html data-theme="cupcake">
     <head>
@@ -34,7 +61,6 @@
                             console.log('✅ Found offline plant:', plant);
                             // Update the page with actual plant data
                             document.title = plant.plantName + ' - Plant Details (Offline)';
-                            // The plant details component will be updated via the plantDetailsScript.js
                             window.offlinePlantData = plant;
                         } else {
                             console.error('❌ Offline plant not found in IndexedDB');

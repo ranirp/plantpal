@@ -1,3 +1,30 @@
+<%#
+/**
+ * @component OnlineOfflineMode
+ * @description Connection status indicator with automatic server connectivity checks
+ * 
+ * Features:
+ * - Real-time connectivity monitoring
+ * - Server reachability verification
+ * - Toast notifications for offline state
+ * - Periodic status checks (30s interval)
+ * - Connection change event handling
+ * - Graceful script loading checks
+ * 
+ * Dependencies:
+ * - connectivityCheck.js - Server connectivity validation
+ * 
+ * Events Handled:
+ * - online: Verifies actual server connectivity
+ * - offline: Updates UI immediately
+ * - periodic: Checks every 30s for status changes
+ * 
+ * UI Elements:
+ * - Toast notification for offline state
+ * - Error icon and message
+ */
+%>
+
 <div class="toast toast-center m-0 p-0 w-full hidden" id="toast">
     <div class="alert alert-error w-full h-8 rounded-sm text-white flex place-content-center place-items-center items-center">
         <svg 
@@ -16,9 +43,6 @@
 </div>
 
 <script>
-    // Note: checkServerConnectivity is now loaded from utils/connectivityCheck.js
-    // This ensures consistent connectivity detection across the entire application
-    
     let isOnlineStatus = false; // Start as offline until verified
     
     // Function to update UI based on connectivity status
@@ -85,7 +109,6 @@
         updateOnlineStatus(false);
     });
     
-    // More aggressive periodic connectivity check - every 30 seconds (reduced frequency)
     setInterval(async () => {
         const actuallyOnline = await checkServerConnectivity();
         // Only update if status changed
@@ -93,8 +116,8 @@
             console.log(`🔄 Status changed: ${isOnlineStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
             updateOnlineStatus(actuallyOnline);
             
-            // Don't trigger additional sync on status change - let the dedicated event listeners handle it
+            // Don't trigger additional sync on status change 
             console.log("Status change detected by periodic check - UI updated but sync not triggered");
         }
-    }, 30000); // Check every 30 seconds (increased from 10 seconds)
+    }, 30000); 
 </script>

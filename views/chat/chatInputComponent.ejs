@@ -1,3 +1,29 @@
+<%#
+/**
+ * @component ChatInput
+ * @description Message input component for chat interface
+ * 
+ * Features:
+ * - Character limit (500 chars)
+ * - Character counter with color indicators
+ * - Responsive design
+ * - Focus states
+ * - Submit button
+ * - Form validation
+ * 
+ * Visual Feedback:
+ * - Normal: Gray counter (0-300 chars)
+ * - Warning: Yellow counter (301-400 chars)
+ * - Critical: Red counter (401-500 chars)
+ * 
+ * Styling:
+ * - Custom placeholder color
+ * - Focus state handling
+ * - Rounded corners
+ * - Consistent spacing
+ */
+%>
+
 <div class="p-4 flex items-center gap-3">
     <div class="flex-1 relative">
         <input
@@ -30,7 +56,6 @@
 </style>
 
 <script>
-    // Character counter for chat input
     document.addEventListener('DOMContentLoaded', function() {
         const chatInput = document.getElementById('chatInput');
         const charCounter = document.getElementById('charCounter');
@@ -39,13 +64,12 @@
             chatInput.addEventListener('input', function() {
                 charCounter.textContent = this.value.length;
                 
-                // Change color based on character count
                 if (this.value.length > 400) {
-                    charCounter.style.color = '#ef4444'; // red
+                    charCounter.style.color = '#ef4444'; 
                 } else if (this.value.length > 300) {
-                    charCounter.style.color = '#f59e0b'; // orange
+                    charCounter.style.color = '#f59e0b'; 
                 } else {
-                    charCounter.style.color = '#9ca3af'; // gray
+                    charCounter.style.color = '#9ca3af'; 
                 }
             });
         }

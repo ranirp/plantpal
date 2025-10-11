@@ -1,24 +1,40 @@
+/**
+ * @fileoverview Add plant form handler with offline support.
+ * Manages plant form submission with image compression, validation, and offline queueing.
+ * Uses Web Workers for client-side image processing and IndexedDB for offline storage.
+ * 
+ * Key Features:
+ * - Client-side image validation and compression via Web Worker
+ * - Automatic offline detection and queue management
+ * - Form validation with real-time feedback
+ * - Character counter for description field
+ * - Duplicate submission prevention
+ * - Background sync for offline submissions
+ */
+
 let loggedInUser = null;
 let imageWorker = null;
-let compressedImageBlob = null; // will hold compressed Blob when worker completes
+let compressedImageBlob = null;
+let isSubmitting = false;
 
-// Function to initialize the application
+/**
+ * Initialize add plant form page.
+ * Sets up Web Worker, form handlers, user info, and UI components.
+ */
 function init() {
-    // Initialize Web Worker
     initializeWebWorker();
-    // Register form submission event
     registerFormSubmit();
-    // Get the logged in user
     getLoggedInUser();
-    // Setup image preview with web worker if available
     setupImagePreviewWithWorker();
-    // Setup character counter for description
     setupCharacterCounter();
 }
 
-// Function to get the logged in user
+/**
+ * Retrieve logged-in user and populate nickname field.
+ * Makes nickname field read-only to prevent tampering.
+ */
 function getLoggedInUser() {
-    // Use existing IndexedDB helper (checkIfUserLoggedIn / getUserName may exist in other scripts)
+    // Try modern auth method first
     if (typeof checkIfUserLoggedIn === 'function') {
         checkIfUserLoggedIn().then((userName) => {
             if (userName && userName.value) {
@@ -34,8 +50,7 @@ function getLoggedInUser() {
         }).catch(() => { loggedInUser = null; });
         return;
     }
-
-    // Fallback if another helper exists (older artifact used getUserName())
+    // Fallback to legacy auth method
     if (typeof getUserName === 'function') {
         getUserName().then((userName) => {
             if (userName) {
@@ -49,81 +64,58 @@ function getLoggedInUser() {
     }
 }
 
-// Function to setup image preview functionality
-// Note: checkServerConnectivity is now loaded from utils/connectivityCheck.js
 /**
- * Initialize Web Worker for image processing
+ * Initialize Web Worker for image processing.
+ * Worker handles validation, compression, and thumbnail generation.
  */
 function initializeWebWorker() {
     if (window.Worker) {
         try {
-            // Worker path assumes public is served as root, adjust if needed
             imageWorker = new Worker('/javascripts/workers/imageWorker.js');
-
             imageWorker.addEventListener('message', function(e) {
                 const { type } = e.data || {};
-
                 switch (type) {
                     case 'COMPRESS_SUCCESS':
-                        console.log('Image compressed successfully');
                         compressedImageBlob = e.data.blob || null;
-                        // log sizes if provided
-                        if (e.data.originalSize) console.log('Original size:', e.data.originalSize);
-                        if (e.data.compressedSize) console.log('Compressed size:', e.data.compressedSize);
                         break;
                     case 'VALIDATION_ERROR':
-                        console.error('Validation errors:', e.data.errors);
                         if (Array.isArray(e.data.errors)) alert(e.data.errors.join('\n'));
                         break;
                     case 'VALIDATION_SUCCESS':
-                        console.log('Image validation passed');
                         break;
                     case 'THUMBNAIL_SUCCESS':
-                        console.log('Thumbnail generated');
                         break;
                     case 'ERROR':
-                        console.error('Worker error:', e.data.message);
                         alert('Error processing image: ' + e.data.message);
                         break;
-                    default:
-                        console.log('Worker message:', e.data);
                 }
             });
-
             imageWorker.addEventListener('error', function(ev) {
-                console.error('Web Worker error:', ev.message);
+                console.error('Web Worker error:', ev);
             });
-
-            console.log('Web Worker initialized successfully');
         } catch (err) {
-            console.warn('Failed to initialize worker:', err.message);
             imageWorker = null;
         }
-    } else {
-        console.warn('Web Workers not supported in this browser');
     }
 }
 
 /**
- * Setup image preview with Web Worker processing
+ * Setup image input handler with preview and worker processing.
+ * Validates file type, displays preview, and sends to worker for compression.
  */
 function setupImagePreviewWithWorker() {
+    // Get reference to photo input element
     const photoInput = document.getElementById("photoID");
     if (photoInput) {
+        // Handle image file selection
         photoInput.addEventListener("change", function(event) {
             const file = event.target.files[0];
             const previewDiv = document.getElementById("imagePreview");
             const previewImg = document.getElementById("previewImg");
-
             if (file && imageWorker) {
-                // Validate image using worker
                 try {
                     imageWorker.postMessage({ type: 'VALIDATE_IMAGE', data: { name: file.name, size: file.size, type: file.type } });
-                } catch (err) {
-                    console.warn('Could not post VALIDATE_IMAGE to worker:', err.message);
-                }
-
-                // Show preview immediately
+                } catch (err) {}
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     if (previewImg && previewDiv) {
@@ -132,15 +124,10 @@ function setupImagePreviewWithWorker() {
                     }
                 };
                 reader.readAsDataURL(file);
-
-                // Send original file to worker for compression
                 try {
                     imageWorker.postMessage({ type: 'COMPRESS_IMAGE', data: { file: file, maxWidth: 800, maxHeight: 600, quality: 0.8 } });
-                } catch (err) {
-                    console.warn('Could not post COMPRESS_IMAGE to worker:', err.message);
-                }
+                } catch (err) {}
             } else if (file) {
-                // Fallback to inline preview if no worker
                 showImagePreview(file);
                 if (previewDiv) previewDiv.classList.remove('hidden');
             } else if (previewDiv) {
@@ -150,19 +137,19 @@ function setupImagePreviewWithWorker() {
     }
 }
 
-// Function to setup character counter for description
-// Function to setup character counter for description
+/**
+ * Setup character counter for description field with visual feedback.
+ * Changes color based on character count:
+ * - Red: < 10 characters (invalid)
+ * - Green: 10-1000 characters (valid)
+ */
 function setupCharacterCounter() {
     const descriptionField = document.getElementById("description");
     const charCount = document.getElementById("charCount");
-
     if (descriptionField && charCount) {
-        // Update count on input
         descriptionField.addEventListener("input", function() {
             const count = descriptionField.value.length;
             charCount.textContent = count;
-
-            // Change color based on validation
             if (count < 10) {
                 charCount.parentElement.classList.add("text-red-500");
                 charCount.parentElement.classList.remove("text-gray-500", "text-green-600");
@@ -171,64 +158,48 @@ function setupCharacterCounter() {
                 charCount.parentElement.classList.remove("text-gray-500", "text-red-500");
             }
         });
-
-        // Initialize count
         charCount.textContent = descriptionField.value.length;
     }
 }
 
-// Function to register form submission event
-let isSubmitting = false; 
-
+/**
+ * Register form submit event handler with duplicate submission prevention.
+ * Looks for form with ID "addPlantForm" or "plantForm".
+ */
 function registerFormSubmit() {
-    // keep backward compatibility: id might be addPlantForm or plantForm
     const plantForm = document.getElementById("addPlantForm") || document.getElementById("plantForm");
     if (plantForm) {
         plantForm.addEventListener("submit", function(event) {
-            event.preventDefault(); // Prevent default form submission
-            
-            // Prevent duplicate submissions
-            if (isSubmitting) {
-                console.log('Form submission already in progress, ignoring duplicate attempt');
-                return;
-            }
-            
-            // Call custom form submission handler
+            event.preventDefault();
+            if (isSubmitting) return;
             addNewPlantDetails();
         });
-    } else {
-        console.error("Plant form not found!");
     }
 }
 
-// Function to add new plant details
+/**
+ * Process plant form submission.
+ * - Validates required fields and description length
+ * - Handles both online and offline submissions
+ * - Shows loading state during submission
+ * - Prevents duplicate submissions
+ */
 function addNewPlantDetails() {
-    // Prevent duplicate submissions
-    if (isSubmitting) {
-        console.log('Submission already in progress, please wait...');
-        return;
-    }
-    
-    // Set submitting flag
+    if (isSubmitting) return;
     isSubmitting = true;
-    
-    // Disable submit button to prevent multiple clicks
     const submitButton = document.querySelector('button[type="submit"]');
     const originalButtonText = submitButton ? submitButton.innerHTML : '';
     if (submitButton) {
         submitButton.disabled = true;
         submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
     }
-    
-    // Get values from the form fields
     const plantName = document.getElementById("plantName") ? document.getElementById("plantName").value.trim() : '';
     const type = document.getElementById("type") ? document.getElementById("type").value : '';
     const description = document.getElementById("description") ? document.getElementById("description").value.trim() : '';
     const nickname = document.getElementById("nickname") ? document.getElementById("nickname").value.trim() : '';
     const photoInput = document.getElementById("photoID");
     const originalPhoto = photoInput && photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
-
-    // Function to reset form state
+    // Helper function to reset UI state after form submission (success or failure)
     const resetFormState = () => {
         isSubmitting = false;
         if (submitButton) {
@@ -236,8 +207,6 @@ function addNewPlantDetails() {
             submitButton.innerHTML = originalButtonText;
         }
     };
-
-    // Validate required fields
     const missing = [];
     if (!plantName) missing.push('Plant Name');
     if (!type) missing.push('Plant Type');
@@ -248,22 +217,20 @@ function addNewPlantDetails() {
         resetFormState();
         return;
     }
-
     if (description.length < 10) {
         alert('Description must be at least 10 characters long.');
         resetFormState();
         return;
     }
-
     if (description.length > 1000) {
         alert('Description cannot exceed 1000 characters.');
         resetFormState();
         return;
     }
-
-    // Choose compressed blob if available, otherwise original file
+    // Use compressed image if available, otherwise use original
     const photoForUpload = compressedImageBlob || originalPhoto;
-
+    
+    // Prepare plant data for submission
     const plantDetails = {
         plantName,
         type,
@@ -272,10 +239,8 @@ function addNewPlantDetails() {
         photo: photoForUpload,
         createdAt: new Date().toISOString()
     };
-
-    // If offline, save metadata to sync DB; if online submit to server
+    // Check both browser online status and actual server connectivity
     if (navigator.onLine && typeof checkServerConnectivity === 'function') {
-        // Prefer to check server reachability before sending large payloads
         checkServerConnectivity().then((isActuallyOnline) => {
             if (isActuallyOnline) {
                 submitPlantDetails(plantDetails, resetFormState);
@@ -283,67 +248,65 @@ function addNewPlantDetails() {
                 savePlantOffline(plantDetails, originalPhoto, resetFormState);
             }
         }).catch(() => {
-            // In case connectivity check fails, attempt submit if navigator.onLine
             submitPlantDetails(plantDetails, resetFormState);
         });
     } else if (navigator.onLine) {
-        // No connectivity check available; attempt submit
         submitPlantDetails(plantDetails, resetFormState);
     } else {
         savePlantOffline(plantDetails, originalPhoto, resetFormState);
     }
 }
 
+/**
+ * Save plant data to IndexedDB for offline synchronization.
+ * @param {Object} plantDetails - The plant details to save
+ * @param {File} originalPhoto - Original photo file before compression
+ * @param {Function} resetFormState - Callback to reset form UI state
+ */
 function savePlantOffline(plantDetails, originalPhoto, resetFormState) {
-    // Save offline with actual File object to IndexedDB for later sync
+    // Generate unique temporary ID for offline storage
     const timestamp = Date.now();
     const tempId = `offline_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
-
-    // Store the actual File object (not just metadata) so we can upload it later
-    // IndexedDB can store File/Blob objects directly
+    
+    // Add offline-specific metadata to plant details
     const offlinePlantDetails = {
         ...plantDetails,
         _id: tempId,
-        photo: originalPhoto || null, // Store the actual File object, not metadata
+        photo: originalPhoto || null,
         __isServerPlant: false,
         __syncStatus: 'pending',
         __createdOffline: true,
         __lastSyncTime: null,
         __tempId: tempId
     };
-
-    console.log('Saving plant offline with photo:', originalPhoto ? `File: ${originalPhoto.name}` : 'No photo');
-
     if (typeof openSyncPlantIDB === 'function' && typeof addNewPlantToSync === 'function') {
         openSyncPlantIDB().then((db) => {
             addNewPlantToSync(db, offlinePlantDetails).then(() => {
                 resetFormState();
                 alert('🌱 Plant saved offline! It will be synced when you are back online.');
                 window.location.href = '/';
-            }).catch((err) => {
-                console.error('Error saving plant offline:', err);
+            }).catch(() => {
                 resetFormState();
                 alert('❌ Error saving plant offline. Please try again.');
             });
-        }).catch((err) => {
-            console.error('Error opening sync DB:', err);
+        }).catch(() => {
             resetFormState();
             alert('❌ Error saving plant offline. Please try again.');
         });
     } else {
-        console.warn('Offline DB helpers not available; cannot save offline.');
         resetFormState();
         alert('Unable to save offline on this device. Please try again when online.');
     }
 }
 
-// Function to submit plant details to the server
+/**
+ * Submit plant details to server using FormData and fetch API.
+ * @param {Object} plantDetails - Plant details including name, type, description, photo
+ * @param {Function} resetFormState - Callback to reset form UI state
+ */
 function submitPlantDetails(plantDetails, resetFormState) {
-    console.log("Submitting plant details:", plantDetails);
-    
-    // Create form data object
+    // Create FormData for multipart/form-data submission (required for file upload)
     const formData = new FormData();
-    // Append plant details to form data
     formData.append("plantName", plantDetails.plantName);
     formData.append("type", plantDetails.type);
     formData.append("description", plantDetails.description);
@@ -351,48 +314,39 @@ function submitPlantDetails(plantDetails, resetFormState) {
     if (plantDetails.photo) {
         formData.append("photo", plantDetails.photo);
     }
-
-    console.log("Form data prepared, sending to server...");
-
-    // Send POST request to the server with plant details
     fetch("/api/plants/addNewPlant", {
         method: "POST",
         body: formData
     })
     .then(response => {
-        console.log("Server response status:", response.status);
         return response.json().then(data => {
             if (response.ok) {
                 return data;
             } else {
-                // Throw error with the server's message
                 throw new Error(data.message || "Error submitting plant details");
             }
         });
     })
-    .then(data => {
-        console.log("Plant details submitted successfully:", data);
+    .then(() => {
         resetFormState();
         alert("🌱 Plant shared successfully!");
-        // Redirect to homepage or show success message
         window.location.href = "/";
     })
     .catch(error => {
-        console.error("Error submitting plant details:", error);
         resetFormState();
-        // Display a user-friendly error message
         alert("❌ " + error.message + "\n\nPlease check your input and try again.");
     });
 }
 
-// Function to listen for online event and sync data
+/**
+ * Listen for online events to trigger synchronization of offline plants.
+ * Checks for pending offline plants and initiates sync when connection is restored.
+ */
 function listenForOnlineSync() {
     window.addEventListener("online", async() => {
-        // Check if there are plants in local storage to sync and update
         const isTherePlantsToSync = await checkIfThereIsPlantsAndUpdate();
-        // If there are no plants to sync, get plants from the server
         if (!isTherePlantsToSync) {
-            console.log("Back online - syncing completed");
+            console.log('No pending plants to sync');
         }
     });
 }

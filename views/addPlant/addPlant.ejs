@@ -1,3 +1,31 @@
+<%#
+/**
+ * @template AddPlant
+ * @description Plant submission form with offline support
+ * 
+ * Features:
+ * - Client-side image compression
+ * - Form validation with character counter
+ * - Offline submission queueing
+ * - Automatic user info population
+ * - Responsive grid layout
+ * - Client-side image preview
+ * 
+ * Form Fields:
+ * - Plant Name (required)
+ * - Plant Type (dropdown, required)
+ * - Description (10-1000 chars, required)
+ * - Photo Upload (optional, with compression)
+ * - Nickname (auto-populated from user)
+ * 
+ * Required Scripts:
+ * - addPlantScript.js - Form handling and submission
+ * - addPlantUtility.js - IndexedDB operations
+ * - userScript.js - User authentication
+ * - connectivityCheck.js - Online status
+ */
+%>
+
 <!DOCTYPE html>
 <html data-theme="cupcake">
     <head>
@@ -22,14 +50,14 @@
         <div class="container mx-auto max-w-7xl mt-16 px-4 py-8">
             <div class="bg-white shadow-xl rounded-xl overflow-hidden">
                 <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[700px]">
-                    <!-- Left Side - Plant Illustration -->
+                    <!-- Plant Illustration -->
                     <div class="bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center p-8 lg:p-12">
                         <div class="text-center">
                             <img src="/images/addplant.jpg" alt="Plant Illustration" class="max-w-full h-auto max-h-80 lg:max-h-96 mx-auto rounded-lg shadow-lg" />
                         </div>
                     </div>
                     
-                    <!-- Right Side - Form -->
+                    <!-- Form -->
                     <div class="flex items-center justify-center p-8 lg:p-12">
                         <div class="w-full max-w-md">
                             <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">Share Your Plant</h1>

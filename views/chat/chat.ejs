@@ -1,3 +1,30 @@
+<%#
+/**
+ * @template Chat
+ * @description Real-time chat interface for plant discussions
+ * 
+ * Features:
+ * - Socket.IO based real-time messaging
+ * - Offline message caching
+ * - Message persistence
+ * - Online/offline status indicator
+ * - Responsive chat layout
+ * - Plant context display
+ * 
+ * Required Data:
+ * @param {Object} data - Plant data object
+ * @param {string} data._id - Plant ID
+ * @param {string} data.plantName - Plant name
+ * @param {string} username - Current user's username
+ * 
+ * Required Scripts:
+ * - socket.io.min.js - Real-time communication
+ * - chatScript.js - Chat functionality
+ * - chatRenderScript.js - Message rendering
+ * - chatIDBUtility.js - Offline storage
+ */
+%>
+
 <!DOCTYPE html>
 <html data-theme="cupcake">
 <head>
@@ -21,7 +48,6 @@
 <script>
     var plantId = '<%= data._id %>';
     var loggedInUser = '<%= username || data.nickname || "Guest" %>';
-    // Let chatScript.js handle initialization through DOMContentLoaded
 </script>
 
 <div class="flex flex-col h-full">

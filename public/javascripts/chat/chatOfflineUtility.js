@@ -1,12 +1,21 @@
 /**
- * Enhanced Chat IndexedDB Utility
- * Provides utilities for offline chat functionality including:
- * - Message synchronization
- * - Message caching
+ * @fileoverview Chat offline utilities for message queueing and caching.
+ * Manages offline chat message storage, pending message queue, and message sync.
+ * Separate from chatIDBUtility.js for alternative database structure.
+ * 
+ * Database Structure:
+ * - chatMessages: Active chat messages
+ * - pendingMessages: Messages queued for sending when back online
+ * - cachedMessages: Cached message history per plant
+ * 
+ * Key Features:
  * - Offline message composition
+ * - Automatic message sync on reconnection
+ * - Plant-specific message caching
+ * - Timestamp-based ordering
+ * - Local ID generation for offline messages
  */
 
-// Constants for chat and chat messages
 const CHAT_IDB_NAME = "plantpalChatDB";
 const CHAT_IDB_VERSION = 2;
 const CHAT_MESSAGES_STORE = "chatMessages";
@@ -14,8 +23,10 @@ const SYNC_CHAT_STORE = "pendingMessages";
 const CHAT_CACHE_STORE = "cachedMessages"; 
 
 /**
- * Initialize the chat database with necessary object stores
- * @returns {Promise<IDBDatabase>} The initialized IndexedDB database
+ * Initialize chat database with message stores.
+ * Creates stores for active messages, pending sync queue, and cache.
+ * 
+ * @returns {Promise<IDBDatabase>} Initialized database instance
  */
 const initChatDatabase = () => {
     return new Promise((resolve, reject) => {

@@ -1,35 +1,49 @@
 /**
- * @fileoverview Multer configuration for handling file uploads in the Plant Sharing Community.
- * Configures file storage, naming conventions, and validation for plant photos.
+ * @fileoverview Multer middleware configuration for plant photo uploads.
+ * Configures disk storage with unique filenames, image validation, and size limits.
+ * Uploads are stored in public/images/uploads/ with timestamped filenames.
  * 
- * @module multer.config
- * @requires multer
- * @requires path
- * 
- * @typedef {Object} MulterConfig
- * @property {Object} storage - Storage engine configuration
- * @property {Function} fileFilter - File type validation function
+ * @requires multer - Multipart form-data processing middleware
+ * @requires path - File path utilities
  */
 
 const multer = require('multer');
 const path = require('path');
 
-// Set up storage engine for multer
+/**
+ * Configure disk storage engine with custom destination and filename logic.
+ */
 const storage = multer.diskStorage({
+    /**
+     * Set upload destination directory.
+     * @param {Object} req - Express request object
+     * @param {Object} file - Uploaded file object
+     * @param {Function} cb - Callback function
+     */
     destination: function (req, file, cb) {
-        // Use absolute path to ensure files are saved in the correct location
         const uploadPath = path.join(__dirname, '../../public/images/uploads/');
-        cb(null, uploadPath); // Directory to save uploaded files
+        cb(null, uploadPath);
     },
+    /**
+     * Generate unique filename with timestamp and random suffix.
+     * Format: fieldname-timestamp-randomNumber.ext
+     * @param {Object} req - Express request object
+     * @param {Object} file - Uploaded file object
+     * @param {Function} cb - Callback function
+     */
     filename: function (req, file, cb) {
         const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
         cb(null, file.fieldname + '-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
-// File filter to validate image files
+/**
+ * File type validator - accepts only image files.
+ * @param {Object} req - Express request object
+ * @param {Object} file - Uploaded file object
+ * @param {Function} cb - Callback function
+ */
 const fileFilter = (req, file, cb) => {
-    // Accept only image files
     if (file.mimetype.startsWith('image/')) {
         cb(null, true);
     } else {
@@ -37,12 +51,15 @@ const fileFilter = (req, file, cb) => {
     }
 };
 
-// Set upload size limits and other options
+/**
+ * Configured Multer instance with storage, validation, and size limits.
+ * Maximum file size: 5MB
+ */
 const upload = multer({ 
     storage: storage,
     fileFilter: fileFilter,
     limits: {
-        fileSize: 5 * 1024 * 1024 // 5MB file size limit
+        fileSize: 5 * 1024 * 1024
     }
 });
 

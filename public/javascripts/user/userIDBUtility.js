@@ -1,6 +1,24 @@
+/**
+ * @fileoverview User IndexedDB utilities for local authentication.
+ * Manages user data storage for PWA offline functionality.
+ * Stores user session information locally for persistent login.
+ * 
+ * Key Features:
+ * - User session persistence
+ * - Offline authentication support
+ * - Simple user management (add, retrieve, delete)
+ * - Auto-incrementing user IDs
+ */
+
 const USER_STORE_NAME = 'users';
 const USER_IDB_NAME = 'userIDB';
 
+/**
+ * Initialize user IndexedDB database.
+ * Creates users object store if it doesn't exist.
+ * 
+ * @returns {Promise<IDBDatabase>} Opened database instance
+ */
 function initializeUserIDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(USER_IDB_NAME, 1);
@@ -25,6 +43,12 @@ function initializeUserIDB() {
     });
 }
 
+/**
+ * Delete all users from IndexedDB.
+ * Used during logout to clear user session.
+ * 
+ * @returns {Promise<void>}
+ */
 function deleteAllUsers() {
     return new Promise((resolve, reject) => {
         initializeUserIDB()
@@ -49,6 +73,13 @@ function deleteAllUsers() {
     });
 }
 
+/**
+ * Add a new user to IndexedDB.
+ * Creates user entry with auto-incrementing ID.
+ * 
+ * @param {string} userName - Username to store
+ * @returns {Promise<Object>} Created user object
+ */
 function addUserToIDB(userName) {
     return new Promise((resolve, reject) => {
         initializeUserIDB()

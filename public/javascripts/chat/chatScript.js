@@ -1,6 +1,15 @@
 /**
- * @fileoverview Real-time chat functionality implementation using Socket.IO.
- * Handles socket connections, message exchange, and offline/online state management.
+ * @fileoverview Real-time chat functionality with offline support.
+ * Manages Socket.IO connection, message sending/receiving, and offline queueing.
+ * Implements connection stability monitoring and automatic reconnection.
+ * 
+ * Key Features:
+ * - Socket.IO real-time messaging
+ * - Offline message queueing with IndexedDB
+ * - Connection stability detection with debouncing
+ * - Automatic room management per plant
+ * - Message persistence and sync
+ * - Connectivity-aware UI updates
  */
 
 let socket;
@@ -9,11 +18,15 @@ let statusUpdateDebounceTimer = null;
 let connectionStable = false;
 let lastStatusUpdate = null;
 
-// Initialize when DOM is fully loaded
+/**
+ * Initialize chat system when DOM is ready.
+ * Delays initialization to ensure all required scripts are loaded.
+ * Creates socket connection and calls init function when ready.
+ */
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Chat DOM loaded, waiting for scripts to initialize...");
     
-    // Wait a bit for the page to fully load all scripts
+    // Delay initialization to ensure dependencies are loaded
     setTimeout(() => {
         initializeSocket();
         // Call init function after socket is initialized
@@ -32,8 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 /**
- * Initialize socket connection with proper error handling
- * and connectivity checks to prevent frequent status changes
+ * Initialize Socket.IO connection with connectivity validation.
+ * Implements retry logic and connection stability monitoring.
+ * Debounces status updates to prevent UI flickering.
  */
 async function initializeSocket() {
     // Ensure we're not initializing multiple times
@@ -66,9 +80,9 @@ async function initializeSocket() {
         socket = io({
             autoConnect: true,
             reconnection: true,
-            reconnectionDelay: 2000,      // Increased to reduce reconnection frequency
-            reconnectionDelayMax: 10000,  // Cap max delay at 10 seconds
-            reconnectionAttempts: 5,      // Limit reconnection attempts
+            reconnectionDelay: 2000,      
+            reconnectionDelayMax: 10000,  
+            reconnectionAttempts: 5,      
             timeout: 20000,
             forceNew: false,
             transports: ['websocket', 'polling']
@@ -106,7 +120,7 @@ async function initializeSocket() {
                     connectionStable = false;
                     lastStatusUpdate = Date.now();
                 }
-            }, 3000); // Longer delay to prevent quick off/on switching
+            }, 3000); 
         });
         
         socket.on('connect_error', function(error) {
@@ -115,7 +129,7 @@ async function initializeSocket() {
         
         socket.on('reconnect', function() {
             console.log('🔄 Socket reconnected');
-            // Rejoin room after reconnection (no immediate UI update here)
+            // Rejoin room after reconnection 
             if (typeof plantId !== 'undefined' && plantId) {
                 joinPlantChatRoom();
             }
@@ -134,14 +148,11 @@ async function initializeSocket() {
  * @param {boolean} isOnline - Whether the chat is currently online
  */
 async function updateChatStatus(isOnline) {
-    // Only perform status update if it's been at least 3 seconds since the last update
-    // or if this is the first status update
     if (lastStatusUpdate && Date.now() - lastStatusUpdate < 3000) {
         console.log("🔄 Skipping rapid status update to prevent flickering");
         return;
     }
     
-    // Double-check connectivity if reporting online
     if (isOnline && typeof checkServerConnectivity === 'function') {
         isOnline = await checkServerConnectivity();
     }
@@ -162,7 +173,6 @@ async function updateChatStatus(isOnline) {
         statusText.textContent = 'Offline';
     }
     
-    // Update the general online/offline status if that function exists
     if (typeof changeOnlineStatus === 'function') {
         changeOnlineStatus(isOnline);
     }
@@ -177,15 +187,13 @@ var chatMessages = [];
 // Add a global function to refresh chat
 window.refreshChat = function() {
     console.log("🔄 Chat refresh function called but is now deprecated");
-    // Function kept for backward compatibility but does nothing
-    // This prevents duplicate message issues
 }
 
 // Make these functions globally accessible
 window.init = function() {
     console.log("Initializing chat...");
     
-    // Make sure socket is initialized
+    // Socket is initialized
     if (!socket) {
         console.log("Socket not initialized yet, waiting...");
         setTimeout(init, 500);
@@ -195,7 +203,6 @@ window.init = function() {
     // Check if plantId exists
     if (typeof plantId === 'undefined' || !plantId) {
         console.error("plantId is not defined in init()");
-        // Try to get it from URL if possible
         const pathParts = window.location.pathname.split('/');
         if (pathParts.length > 2) {
             plantId = pathParts[2];
@@ -206,7 +213,6 @@ window.init = function() {
     // Check if loggedInUser exists
     if (typeof loggedInUser === 'undefined' || !loggedInUser) {
         console.error("loggedInUser is not defined in init()");
-        // Try to get from DOM or set default
         loggedInUser = "Guest";
     }
     
@@ -227,8 +233,6 @@ window.init = function() {
         });
     }
 }
-
-// Note: checkServerConnectivity is now loaded from utils/connectivityCheck.js
 
 function listenForOnlineSync() {
     // Check initial status with server connectivity
@@ -273,18 +277,17 @@ function listenForOnlineSync() {
         console.log("❌ You are offline now");
     });
     
-    // Periodic check every 15 seconds (more responsive)
+    // Periodic check every 15 seconds 
     setInterval(async () => {
-        if (navigator.onLine) {  // Only check server if browser reports online
+        if (navigator.onLine) { 
             const actuallyOnline = await checkServerConnectivity();
             const currentStatus = document.getElementById('chatStatusText')?.textContent === 'Online';
-            // Only update if status changed
             if (actuallyOnline !== currentStatus) {
                 console.log(`🔄 Chat status changed: ${currentStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
                 updateChatStatus(actuallyOnline);
             }
         }
-    }, 15000); // Check every 15 seconds
+    }, 15000);
 }
 
 function changeOnlineStatus(isOnline) {
@@ -328,7 +331,7 @@ function registerFormSubmit() {
     const chatForm = document.getElementById("chatForm");
     if (chatForm) {
         chatForm.addEventListener("submit", function (event) {
-            event.preventDefault(); // Prevent default form submission
+            event.preventDefault(); 
             sendMessage();
         });
     } else {
@@ -342,13 +345,11 @@ async function sendMessage(isSuggestingName = false) {
         return;
     }
     
-    // Create message with consistent property names 
-    // Use both formats to ensure compatibility with all parts of the system
     var chatMessage = {
         chatmessage: input.value.trim(),
-        chatMessage: input.value.trim(),  // Add this property for consistency
+        chatMessage: input.value.trim(),  
         username: loggedInUser,
-        userName: loggedInUser,  // Add this property for consistency
+        userName: loggedInUser,  
         plantId: plantId,
         chattime: new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
         chatTime: new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
@@ -358,40 +359,29 @@ async function sendMessage(isSuggestingName = false) {
     const isActuallyOnline = navigator.onLine && await checkServerConnectivity();
     
     if (isActuallyOnline) {
-        // Online: Send message - DON'T render immediately
-        // Let socket.io broadcast handle rendering for everyone including sender
-        input.value = ""; // Clear input field
+        input.value = ""; 
         console.log("Sending chat message (online):", chatMessage);
         
-        // Save to database and emit to socket
-        // The socket will broadcast back to everyone, including the sender
         addChatToDB(chatMessage);
         socket.emit("chat", chatMessage);
     } else {
-        // Offline: Check if this is user's own plant
         if (await isUserOwnPlant(plantId, loggedInUser)) {
-            // User can add messages to their own plants when offline
-            input.value = ""; // Clear input field
+            input.value = ""; 
             console.log("📱 Adding offline message to user's own plant:", chatMessage);
             
             try {
-                // Add special flag for offline status
                 chatMessage.__offlineCreated = true;
                 chatMessage.__syncStatus = 'pending';
                 chatMessage.__timestamp = Date.now();
                 
-                // Store message in IndexedDB for later sync
-                const db = await getChatDatabase(); // Use our improved database
+                const db = await getChatDatabase(); 
                 
                 // Store in pending sync
                 await addNewChatToSync(db, chatMessage);
                 console.log("📦 Chat message queued for sync");
                 
-                // Also add to local cached messages for this plant
                 try {
-                    // Get current cache
                     const cachedMessages = await getCachedChatMessages(plantId);
-                    // Add new message and update cache
                     cachedMessages.push(chatMessage);
                     await cacheChatMessages(plantId, cachedMessages);
                     console.log("📦 Updated offline chat cache with new message");
@@ -409,7 +399,6 @@ async function sendMessage(isSuggestingName = false) {
                 alert("Failed to save your message for later sync. Please try again.");
             }
         } else {
-            // Not user's plant - cannot chat offline
             alert("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.");
             return;
         }
@@ -419,7 +408,6 @@ async function sendMessage(isSuggestingName = false) {
 // Function to check if the current plant belongs to the logged-in user
 async function isUserOwnPlant(plantId, username) {
     try {
-        // First try to check from server if online
         if (navigator.onLine) {
             const response = await fetch(`/plantDetails/checkOwnership/${plantId}/${username}`);
             if (response.ok) {
@@ -428,7 +416,6 @@ async function isUserOwnPlant(plantId, username) {
             }
         }
         
-        // Fallback: check from IndexedDB
         try {
             const db = await openSyncPlantIDB();
             const plants = await getAllSyncPlants(db);
@@ -444,7 +431,7 @@ async function isUserOwnPlant(plantId, username) {
         }
     } catch (error) {
         console.error("Error checking plant ownership:", error);
-        return false; // Default to not allowing offline chat if we can't verify
+        return false; 
     }
 }
 
@@ -494,7 +481,7 @@ function registerSocket() {
     // Make sure socket exists before registering events
     if (!socket) {
         console.error("Cannot register socket events - socket not initialized");
-        setTimeout(registerSocket, 1000); // Try again after 1 second
+        setTimeout(registerSocket, 1000); 
         return;
     }
     
@@ -540,7 +527,6 @@ function registerSocket() {
 function addChatToDB(message) {
     console.log("Sending message to database:", message);
     
-    // Use the correct endpoint pattern: /api/chat/plants/{plantId}/messages
     const chatEndpoint = `/api/chat/plants/${message.plantId}/messages`;
     console.log("Using endpoint:", chatEndpoint);
     
@@ -563,8 +549,6 @@ function addChatToDB(message) {
     .then(data => {
         if (data.success) {
             console.log('✅ Chat message saved to database:', data);
-            // Don't render here - let socket handle it to avoid duplicates
-            // The socket will emit back the message to all connected clients
         } else {
             console.error('❌ Failed to save chat message:', data);
         }
@@ -732,10 +716,7 @@ function renderChatMessage(messages) {
             if (!message.chatMessage && message.chatmessage) message.chatMessage = message.chatmessage;
             if (!message.chatmessage && message.chatMessage) message.chatmessage = message.chatMessage;
             
-            // Handle chattime/chatTime formats or create a timestamp if missing
-            // Only format if not already formatted
             if (message.chatTime && !message.chatTime.includes(',')) {
-                // Already a localized string, keep it
             } else if (message.chattime || message.chatTime) {
                 let chatTime = new Date(message.chattime || message.chatTime);
                 if (!isNaN(chatTime.getTime())) {
@@ -750,11 +731,9 @@ function renderChatMessage(messages) {
                     message.chatTime = formattedChatTime;
                     message.chattime = formattedChatTime;
                 } else {
-                    // Invalid date, use as-is
                     message.chatTime = message.chattime || message.chatTime || 'Just now';
                 }
             } else {
-                // If no timestamp, use current time
                 let chatTime = new Date();
                 let formattedChatTime = chatTime.toLocaleString("en-US", {
                     month: "long",

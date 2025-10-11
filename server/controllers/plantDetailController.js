@@ -1,8 +1,20 @@
+/**
+ * @fileoverview Plant detail controller.
+ * Handles individual plant detail page rendering and ownership verification.
+ * Supports both online (database) and offline (IndexedDB) plant viewing modes.
+ * 
+ * @requires mongodb - MongoDB ObjectId utilities
+ * @requires ../models/addPlantModel - Plant database model
+ */
+
 const { objectId } = require('mongodb');
 const addPlant = require('../models/addPlantModel');
 
 /**
- * Get plant by plant ID
+ * Retrieve a single plant from database by ID.
+ * 
+ * @param {string} plantId - Plant document ID
+ * @returns {Promise<Object|null>} Plant document or null if not found
  */
 async function getPlant(plantId) {
     try {
@@ -15,7 +27,14 @@ async function getPlant(plantId) {
 }
 
 /**
- * Render plant detail page
+ * Render plant detail page for online or offline plants.
+ * Detects offline plants by 'offline_' prefix and enables offline mode.
+ * 
+ * @param {Object} req - Express request object
+ * @param {string} req.params.plantID - Plant ID (or offline ID)
+ * @param {string} req.params.userName - Current user nickname
+ * @param {Object} res - Express response object
+ * @returns {HTML} Rendered plant details view
  */
 exports.plantDetailPage = async (req, res) => {
     try {

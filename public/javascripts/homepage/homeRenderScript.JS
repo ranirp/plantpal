@@ -1,9 +1,28 @@
-var placeHolderImage = '/images/placeholder.jpg';
+/**
+ * @fileoverview Plant list rendering functionality.
+ * Handles the display of plant cards in grid layout with offline support.
+ * Implements placeholder images, offline indicators, and card interactions.
+ * 
+ * Key Features:
+ * - Responsive grid layout
+ * - Image fallback handling
+ * - Offline plant support
+ * - Card interaction events
+ * - Empty state messaging
+ */
+
+// Default placeholder image for plants without photos
+const placeHolderImage = '/images/placeholder.jpg';
 
 /**
- * Generate a temporary ID for offline plants based on their properties
- * @param {Object} plant - Plant object
- * @returns {string|null} - Generated temporary ID or null if unable to generate
+ * Generate a unique temporary ID for offline plants.
+ * Creates a URL-safe identifier from plant properties for offline navigation.
+ * 
+ * @param {Object} plant - Plant object with name, nickname, and timestamp
+ * @param {string} plant.plantName - Name of the plant
+ * @param {string} [plant.nickname] - Owner's nickname
+ * @param {string|number} [plant.createdAt] - Creation timestamp
+ * @returns {string|null} Generated temporary ID or null if invalid plant
  */
 function generateOfflinePlantId(plant) {
     if (!plant || !plant.plantName) {
@@ -20,7 +39,16 @@ function generateOfflinePlantId(plant) {
     return tempId;
 }
 
-// Function to render the list of plants
+/**
+ * Render the complete list of plants in a grid layout.
+ * Creates plant cards or displays empty state message.
+ * 
+ * @param {Array<Object>} plantList - Array of plant objects to display
+ * @param {string} plantList[].plantName - Name of the plant
+ * @param {string} plantList[].type - Type of plant (succulent, fern, etc.)
+ * @param {string} plantList[].description - Plant description
+ * @param {string|Object} plantList[].photo - Photo filename or offline photo object
+ */
 function renderPlantList(plantList) {
     console.log("renderPlantList called with:", plantList);
     console.log("Number of plants to render:", plantList.length);
@@ -80,16 +108,26 @@ function renderPlantList(plantList) {
     }
 }
 
-// Function to create a card element for a plant
+/**
+ * Create a styled card element for a plant.
+ * Includes photo, name, type, owner, date, and description.
+ * Handles both online and offline plant data differently.
+ * 
+ * @param {Object} plant - Plant data to display
+ * @param {string} plant.plantName - Name of the plant
+ * @param {string} plant.type - Type of plant
+ * @param {string} plant.nickname - Owner's nickname
+ * @param {string|Object} plant.photo - Photo data (filename or File object)
+ * @param {string} plant.description - Plant description
+ * @param {string} [plant._id] - Server-assigned ID (if online)
+ * @param {string} [plant.createdAt] - Creation timestamp
+ * @returns {HTMLElement} Constructed card element
+ */
 function createdCard(plant) {
     var card = document.createElement('div');
 
-    // Determine photo path
+    // Determine photo path based on plant's online/offline status
     let photoPath;
-    
-    // A plant is considered truly offline if:
-    // 1. It has no server _id AND
-    // 2. It has photo metadata with type (indicating offline upload)
     const isTrulyOfflinePlant = !plant._id && plant.photo && typeof plant.photo === 'object' && plant.photo.type;
     
     if (isTrulyOfflinePlant) {
@@ -106,9 +144,8 @@ function createdCard(plant) {
     // Add classes for styling the card
     card.className = "card shadow-lg bg-white cursor-pointer hover:shadow-xl transition-shadow";
     
-    // Set the onclick event to show plant details page
+    // Handle click events to navigate to plant details
     card.onclick = function() {
-        // Try to get any valid ID from the plant object
         const plantId = plant._id || plant.id || plant.plantId;
         
         if (plantId) {
@@ -166,8 +203,6 @@ function createdCard(plant) {
     typeBadge.className = "badge badge-primary capitalize mt-2";
     typeBadge.textContent = plant.type;
 
-    // Removed sync status indicator to clean up UI
-
     // Create info container
     var infoDiv = document.createElement('div');
     infoDiv.className = "mt-3 space-y-1";
@@ -177,7 +212,7 @@ function createdCard(plant) {
     nickname.className = "text-sm text-gray-600";
     nickname.innerHTML = '<i class="fas fa-user mr-2"></i>' + plant.nickname;
 
-    // Create and set the creation date
+    // Format and display plant creation date
     var dateElement = document.createElement('p');
     dateElement.className = "text-sm text-gray-600";
     let formattedDate = 'Date not available';
@@ -195,7 +230,6 @@ function createdCard(plant) {
     }
     dateElement.innerHTML = '<i class="fas fa-calendar-alt mr-2"></i>' + formattedDate;
 
-    // Create description preview
     var description = document.createElement('p');
     description.className = "text-sm text-gray-700 mt-2 line-clamp-2";
     description.textContent = plant.description;

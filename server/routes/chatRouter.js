@@ -1,14 +1,22 @@
 /**
- * @fileoverview Express router for chat-related endpoints.
- * Handles adding new chat messages and retrieving messages for a specific plant using the ChatMessage model.
+ * @fileoverview Chat router configuration.
+ * Handles routes for plant-specific chat messages with connectivity checking.
+ * Supports both adding new messages and retrieving message history per plant.
+ * 
+ * @requires express - Web application framework
+ * @requires ../controllers/chatController - Chat message request handlers
  */
 
-var express = require('express');
+const express = require('express');
 const chatController = require('../controllers/chatController');
 
-var router = express.Router();
+const router = express.Router();
 
-// Ping endpoint for checking chat connectivity
+/**
+ * GET /chat/ping - Health check endpoint for chat service
+ * @route GET /ping
+ * @returns {Object} 200 - Chat service status with timestamp
+ */
 router.get('/ping', (req, res) => {
     res.status(200).json({
         status: 'success',
@@ -17,14 +25,25 @@ router.get('/ping', (req, res) => {
     });
 });
 
-// Route to add a new chat message for a specific plant
+/**
+ * POST /chat/plants/:id/messages - Add new chat message for a specific plant
+ * @route POST /plants/:id/messages
+ * @param {string} id - Plant ID
+ * @param {string} message - Message content (from request body)
+ * @param {string} nickname - User nickname (from request body)
+ * @returns {Object} 201 - Message created successfully
+ */
 router.post('/plants/:id/messages', (req, res, next) => {
-    // Attach plantId from URL params to request body
     req.body.plantId = req.params.id;
     chatController.addChatMessage(req, res, next);
 });
 
-// Route to get all chat messages for a specific plant
+/**
+ * GET /chat/plants/:id/messages - Retrieve all messages for a specific plant
+ * @route GET /plants/:id/messages
+ * @param {string} id - Plant ID
+ * @returns {Object} 200 - Array of message objects
+ */
 router.get('/plants/:id/messages', chatController.getChatMessagesByPlantId);
 
 module.exports = router;

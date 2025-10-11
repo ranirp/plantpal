@@ -1,9 +1,18 @@
-var placeHolderImage = '/images/placeholder.jpg';
+/**
+ * @fileoverview Homepage plant list rendering utilities.
+ * Creates dynamic plant card UI elements from plant data.
+ * Handles both online (server) and offline (IndexedDB) plant display.
+ * Generates temporary IDs for offline plants and manages empty state UI.
+ */
+
+const placeHolderImage = '/images/placeholder.jpg';
 
 /**
- * Generate a temporary ID for offline plants based on their properties
- * @param {Object} plant - Plant object
- * @returns {string|null} - Generated temporary ID or null if unable to generate
+ * Generate unique temporary ID for offline plants.
+ * Creates identifier from plant properties for consistent offline tracking.
+ * 
+ * @param {Object} plant - Plant object with plantName, nickname, createdAt
+ * @returns {string|null} Offline plant ID or null if invalid
  */
 function generateOfflinePlantId(plant) {
     if (!plant || !plant.plantName) {
@@ -20,7 +29,12 @@ function generateOfflinePlantId(plant) {
     return tempId;
 }
 
-// Function to render the list of plants
+/**
+ * Render plant cards in grid layout.
+ * Clears existing content and displays plant cards or empty state message.
+ * 
+ * @param {Array} plantList - Array of plant objects to display
+ */
 function renderPlantList(plantList) {
     console.log("🎨 renderPlantList called");
     console.log("📊 Number of plants to render:", plantList ? plantList.length : 0);
@@ -41,7 +55,6 @@ function renderPlantList(plantList) {
     // Check if there are no plants to display
     if (plantList.length === 0) {
         console.log("No plants to display, showing empty message");
-        // If no plants, create a message indicating no plants have been added
         const noMessagesDiv = document.createElement("div");
 
         // Add classes for styling 'no plants' message
@@ -86,16 +99,19 @@ function renderPlantList(plantList) {
     }
 }
 
-// Function to create a card element for a plant
+/**
+ * Create individual plant card DOM element.
+ * Builds card with image, title, type, description, and action button.
+ * Handles both online and offline plant display modes.
+ * 
+ * @param {Object} plant - Plant object with all properties
+ * @returns {HTMLElement} Complete plant card div element
+ */
 function createdCard(plant) {
     var card = document.createElement('div');
 
     // Determine photo path
     let photoPath;
-    
-    // A plant is considered truly offline if:
-    // 1. It has no server _id AND
-    // 2. It has photo metadata with type (indicating offline upload)
     const isTrulyOfflinePlant = !plant._id && plant.photo && typeof plant.photo === 'object' && plant.photo.type;
     
     if (isTrulyOfflinePlant) {

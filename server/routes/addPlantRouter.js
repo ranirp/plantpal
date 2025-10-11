@@ -1,10 +1,15 @@
 /**
- * @fileoverview Express router for plant-related endpoints.
- * Handles adding new plants (with photo upload), retrieving all plants with optional sorting,
- * and fetching a specific plant by its ID. Integrates with the AddPlant Mongoose model.
+ * @fileoverview Plant management router configuration.
+ * Handles routes for adding new plants with photo uploads and retrieving plant data.
+ * Implements multipart/form-data processing with Multer for image uploads.
+ * 
+ * @requires express - Web application framework
+ * @requires multer - Multipart form-data processing middleware
+ * @requires ../controllers/addPlantController - Plant request handlers
+ * @requires ../middleware/multer.config - File upload configuration
  */
 
-var express = require('express');
+const express = require('express');
 const multer = require('multer');
 const {
     addPlantPage,
@@ -15,18 +20,25 @@ const {
 } = require('../controllers/addPlantController');
 const upload = require('../middleware/multer.config.js');
 
-var router = express.Router();
+const router = express.Router();
 
 /**
- * Get /addAPlant
- * Render the page to add a new plant
+ * GET /addPlant - Render add plant form page
+ * @route GET /
+ * @returns {HTML} Add plant form view
  */
 router.get('/', addPlantPage);
 
 /**
- * POST /addPlant/addNewPlant
- * Add a new plant to the database 
- * Accepts multipart form data with optional photo 
+ * POST /addPlant/addNewPlant - Create new plant entry with optional photo
+ * @route POST /addNewPlant
+ * @param {string} plantName - Name of the plant
+ * @param {string} type - Plant type (succulent, fern, houseplant, etc.)
+ * @param {string} description - Plant description
+ * @param {file} photo - Optional plant photo (processed by Multer)
+ * @param {string} nickname - User nickname
+ * @returns {Object} 201 - Plant created successfully
+ * @returns {Object} 400 - Validation or upload error
  */
 router.post('/addNewPlant', (req, res, next) => {
     upload.single('photo')(req, res, (err) => {
@@ -39,19 +51,33 @@ router.post('/addNewPlant', (req, res, next) => {
                     : `File error: ${err.message}`
             });
         }
-        // If no error, proceed to controller
         next();
     });
 }, addNewPlantToDB);
 
-/** 
- * API Endpoints (for plant retrieval)
+/**
+ * GET /addPlant/getAllPlants - Retrieve all plants
+ * @route GET /getAllPlants
+ * @returns {Object} 200 - Array of plant objects
  */
 router.get('/getAllPlants', getAllPlants);
+
+/**
+ * GET /addPlant/getPlantById/:id - Retrieve specific plant by ID
+ * @route GET /getPlantById/:id
+ * @param {string} id - Plant ID
+ * @returns {Object} 200 - Plant object
+ */
 router.get('/getPlantById/:id', getPlantById);
+
+/**
+ * GET /addPlant/getPlantsByType/:type - Retrieve plants filtered by type
+ * @route GET /getPlantsByType/:type
+ * @param {string} type - Plant type
+ * @returns {Object} 200 - Array of filtered plant objects
+ */
 router.get('/getPlantsByType/:type', getPlantsByType);
 
-// Export the router
 module.exports = router;
 
 

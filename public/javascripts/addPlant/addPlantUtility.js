@@ -1,20 +1,33 @@
-// Constants for IndexedDB database and object store names
+/**
+ * @fileoverview IndexedDB utilities for offline plant management.
+ * Provides database operations for caching plant data and managing sync queue.
+ * Implements two stores: plantDetails (cached from server) and plants (pending upload).
+ * 
+ * Key Features:
+ * - Plant data caching for offline viewing
+ * - Sync queue for offline plant submissions
+ * - Duplicate detection and prevention
+ * - Database version management
+ * - Transaction-based operations
+ */
+
 const PLANT_IDB_NAME = 'plantIDB';
 const PLANT_DETAILS_STORE_NAME = 'plantDetails';
 const SYNC_PLANT_STORE_NAME = 'plants';
 const SYNC_PLANT_EVENT = 'plant';
 
 /**
- * Function to add a new plant to the IndexedDB for synced plants.
- * Prevents duplicates by checking for existing plants with the same _id.
- * @param {IDBDatabase} plantDB - IndexedDB instance for synced plants.
- * @param {Object} plantDetails - Details of the plant to be added.
- * @returns {Promise} - Promise resolving to the added plant details.
+ * Add new plant to sync queue store.
+ * Checks for duplicates before adding. Updates existing entries if found.
+ * 
+ * @param {IDBDatabase} plantDB - Opened IndexedDB database instance
+ * @param {Object} plantDetails - Plant data to queue for sync
+ * @returns {Promise<Object>} Added or updated plant object
  */
 const addNewPlantToSync = (plantDB, plantDetails) => {
     return new Promise(async (resolve, reject) => {
         try {
-            // First, check if a plant with the same _id already exists (for server plants)
+            // First, check if a plant with the same _id already exists 
             if (plantDetails._id && plantDetails.__isServerPlant) {
                 const existingPlants = await getAllSyncPlants(plantDB);
                 const existingPlant = existingPlants.find(item => {
@@ -71,10 +84,12 @@ const addNewPlantToSync = (plantDB, plantDetails) => {
 };
 
 /**
- * Function to retrieve all plants stored for sync from IndexedDB.
- * @param {IDBDatabase} plantDB - IndexedDB instance for synced plants.
- * @returns {Promise} - Promise resolving to an array of synced plant details.
-*/
+ * Retrieve all plants from sync queue store.
+ * Returns all pending plant submissions that need to be synced with server.
+ * 
+ * @param {IDBDatabase} plantDB - IndexedDB database connection
+ * @returns {Promise<Array<Object>>} Array of queued plant objects
+ */
 const getAllSyncPlants = (plantDB) => {
     return new Promise((resolve, reject) => {
         const transaction = plantDB.transaction([SYNC_PLANT_STORE_NAME]);
@@ -192,12 +207,9 @@ const getAllPlantsFromIDB = () => {
                     console.log('Generated temporary ID for plant without _id:', cleanPlant._id);
                 }
                 
-                // Clean up photo metadata - if it's an object with metadata, convert to string filename
                 if (cleanPlant.photo && typeof cleanPlant.photo === 'object' && cleanPlant.photo.name) {
-                    // This was an offline uploaded photo, but if the plant has an _id, it means it's been synced
-                    // and the photo is no longer available, so we should remove the photo reference
                     if (cleanPlant._id && !cleanPlant._id.startsWith('offline_')) {
-                        cleanPlant.photo = null; // Remove photo reference for synced plants that had offline photos
+                        cleanPlant.photo = null; // Remove photo reference for synced plants 
                     } else {
                         // Keep the metadata for truly offline plants
                         cleanPlant.photo = cleanPlant.photo;
@@ -209,7 +221,7 @@ const getAllPlantsFromIDB = () => {
             resolve(plants);
         } catch (error) {
             console.error('Error getting plants from IndexedDB:', error);
-            resolve([]); // Return empty array on error
+            resolve([]); 
         }
     });
 };

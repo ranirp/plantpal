@@ -1,7 +1,30 @@
-<!-- Card element with background styling -->
+<%#
+/**
+ * @component PlantItemComponent
+ * @description A responsive card component displaying a plant item in the grid view
+ * 
+ * Features:
+ * - Interactive hover effects
+ * - Responsive image with fallback
+ * - Plant type badge
+ * - Owner information with icon
+ * - Truncated description
+ * 
+ * Required Data:
+ * @param {Object} plant - Plant data object
+ * @param {string} plant._id - Unique identifier
+ * @param {string} plant.photo - Photo filename
+ * @param {string} plant.plantName - Name of the plant
+ * @param {string} plant.type - Plant type/category
+ * @param {string} plant.nickname - Owner's nickname
+ * @param {Date} plant.dateAdded - Creation date
+ * @param {string} plant.description - Plant description
+ */
+%>
+
 <div class="card shadow-lg bg-white hover:shadow-xl transition-all duration-300 cursor-pointer border border-gray-100 rounded-lg overflow-hidden"
     onclick="showDetailsPage('<%= plant._id %>')">
-    <!-- Image element displaying plant's image -->
+    <%# Plant image with hover effect and type badge %>
     <figure class="relative overflow-hidden">
         <img 
             src="/images/uploads/<%= plant.photo %>" 

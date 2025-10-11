@@ -1,14 +1,22 @@
 /**
- * @fileoverview Controller for chat message operations.
- * Handles adding new chat messages and retrieving messages by plant ID using the ChatMessage model.
+ * @fileoverview Chat message controller.
+ * Handles chat message creation and retrieval for plant-specific conversations.
+ * Supports multiple data format structures for backward compatibility.
+ * 
+ * @requires ../models/chatModel - Chat message database model
  */
 
 const ChatMessage = require('../models/chatModel');
 
 /**
- * Renders the chat page for a specific user and plant
+ * Render the chat page for a specific plant and user.
+ * 
+ * @param {Object} req - Express request object
+ * @param {string} req.params.plantID - Plant ID
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
  */
-exports.chatPage =  async (req, res, next) => {
+exports.chatPage = async (req, res, next) => {
     const plantID = req.params.plantID;
     const username = req.session.username || req.query.user || 'Guest';
     res.render("chat/chatPage", {
@@ -18,7 +26,17 @@ exports.chatPage =  async (req, res, next) => {
 };
 
 /**
- * Retrieves chat messages for a specific plant from the database
+ * Retrieve all chat messages for a specific plant.
+ * Messages are sorted chronologically (oldest first).
+ * Disables HTTP caching for real-time message retrieval.
+ * 
+ * @param {Object} req - Express request object
+ * @param {string} req.params.plantID - Plant ID (or req.params.id)
+ * @param {Object} res - Express response object
+ * @param {Function} next - Express next middleware function
+ * @returns {Object} 200 - Array of chat message objects
+ * @returns {Object} 400 - Missing plant ID
+ * @returns {Object} 500 - Server error
  */
 exports.getChatMessagesByPlantId = async (req, res, next) => {
     try {

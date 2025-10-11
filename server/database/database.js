@@ -1,14 +1,25 @@
+/**
+ * @fileoverview MongoDB database connection configuration using Mongoose.
+ * Establishes connection with timeout settings and monitors connection status.
+ * Sets global availability flag for application-wide database status checks.
+ * 
+ * @requires mongoose - MongoDB object modeling tool
+ * @requires dotenv - Environment variable loader
+ */
+
 const mongoose = require("mongoose");
 require("dotenv").config();
 
-// MongoDB connection
 const URI = process.env.MONGO_DB;
 
-// Enhanced MongoDB connection with more robust error handling
+/**
+ * Initialize MongoDB connection with optimized timeout settings.
+ * Uses shorter timeouts (5s server selection, 45s socket timeout) for faster failure detection.
+ */
 mongoose
     .connect(URI, {
-        serverSelectionTimeoutMS: 5000, // Timeout after 5s instead of 30s
-        socketTimeoutMS: 45000, // Close sockets after 45s of inactivity
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
     })
     .then(() => {
         console.log("✅ Successfully connected to MongoDB");
@@ -16,12 +27,13 @@ mongoose
     .catch((err) => {
         console.error("❌ Error connecting to MongoDB:", err.message);
         console.error("Please check that MongoDB is running and connection string is correct");
-        
-        // Notify the application that MongoDB is not available
         global.isMongoDBAvailable = false;
     });
 
-// Set up connection status monitoring
+/**
+ * Monitor Mongoose connection events and update global availability status.
+ * Used by controllers to provide graceful degradation when database is unavailable.
+ */
 mongoose.connection.on('connected', () => {
     console.log('🔄 Mongoose connection established');
     global.isMongoDBAvailable = true;
