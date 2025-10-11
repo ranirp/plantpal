@@ -8,17 +8,25 @@ const addNewChatToSync = (syncChatTDB, message) => {
     return new Promise((resolve, reject) => {
         const transaction = syncChatTDB.transaction([SYNC_CHAT_STORE_NAME], "readwrite");
         const chatStore = transaction.objectStore(SYNC_CHAT_STORE_NAME);
-        const addRequest = chatStore.add({ value: message});
+        const addRequest = chatStore.add({ value: message });
+
+        // Attach error handler immediately so we catch failures to add
+        addRequest.addEventListener("error", (event) => {
+            reject(event.target.error);
+        });
+
         addRequest.addEventListener("success", () => {
-            console.log("Added" + "#" + addRequest.result + ": " + message);
+            try {
+                console.log(`Added#${addRequest.result}: ${JSON.stringify(message)}`);
+            } catch (e) {
+                console.log("Added#%s: (message)", addRequest.result);
+            }
+
             const getRequest = chatStore.get(addRequest.result);
             getRequest.addEventListener("success", () => {
                 resolve(getRequest.result);
             });
             getRequest.addEventListener("error", (event) => {
-                reject(event.target.error);
-            });
-            addRequest.addEventListener("error", (event) => {
                 reject(event.target.error);
             });
         });
