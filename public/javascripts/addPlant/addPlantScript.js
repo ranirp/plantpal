@@ -15,32 +15,43 @@ function init() {
 
 // Function to get the logged in user
 function getLoggedInUser() {
-    // Asynchronously retrieve the user name
-    getUserName().then((userName) => {
+    // Use the proper IndexedDB user management system
+    checkIfUserLoggedIn().then((userName) => {
         // If user name exists, set it as the logged-in user
-        if (userName) {
+        if (userName && userName.value) {
             loggedInUser = userName.value;
+            console.log("User logged in:", loggedInUser);
             // Pre-fill the nickname field with the logged-in user's name
             const nicknameField = document.getElementById("nickname");
             if (nicknameField && loggedInUser) {
                 nicknameField.value = loggedInUser;
+                // Make the field readonly since they're logged in
+                nicknameField.readOnly = true;
+                nicknameField.style.backgroundColor = '#f3f4f6'; // Light gray background
+                nicknameField.title = 'This is your logged-in username';
+            }
+        } else {
+            console.log("No user logged in - user can enter any nickname");
+            loggedInUser = null;
+            // Make sure the field is editable if no user is logged in
+            const nicknameField = document.getElementById("nickname");
+            if (nicknameField) {
+                nicknameField.readOnly = false;
+                nicknameField.style.backgroundColor = '';
+                nicknameField.title = '';
+                nicknameField.placeholder = 'Enter your nickname';
             }
         }
     }).catch((error) => {
         console.log("No user logged in or error getting user:", error);
-        // Continue without user info
-    });
-}
-
-// Placeholder function for getUserName - replace with actual implementation
-function getUserName() {
-    return new Promise((resolve, reject) => {
-        // For now, return a default value or check localStorage
-        const storedUser = localStorage.getItem('currentUser');
-        if (storedUser) {
-            resolve({ value: storedUser });
-        } else {
-            resolve({ value: 'Anonymous' });
+        loggedInUser = null;
+        // Make sure the field is editable if there's an error
+        const nicknameField = document.getElementById("nickname");
+        if (nicknameField) {
+            nicknameField.readOnly = false;
+            nicknameField.style.backgroundColor = '';
+            nicknameField.title = '';
+            nicknameField.placeholder = 'Enter your nickname';
         }
     });
 }
