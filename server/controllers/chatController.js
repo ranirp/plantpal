@@ -22,6 +22,13 @@ exports.chatPage =  async (req, res, next) => {
  */
 exports.getChatMessagesByPlantId = async (req, res, next) => {
     try {
+        // Prevent HTTP caching of API responses
+        res.set({
+            'Cache-Control': 'no-store, no-cache, must-revalidate, private',
+            'Pragma': 'no-cache',
+            'Expires': '0'
+        });
+
         // Handle both parameter formats: :plantID and :id
         const plantID = req.params.plantID || req.params.id;
         console.log("Getting chat messages for plantID:", plantID);
