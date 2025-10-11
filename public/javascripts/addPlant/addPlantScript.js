@@ -1,59 +1,52 @@
-// Declare a variable to hold the logged in user information
 let loggedInUser = null;
+let imageWorker = null;
+let compressedImageBlob = null; // will hold compressed Blob when worker completes
 
 // Function to initialize the application
 function init() {
-    // Register form submission event 
+    // Initialize Web Worker
+    initializeWebWorker();
+    // Register form submission event
     registerFormSubmit();
     // Get the logged in user
     getLoggedInUser();
-    // Setup image preview functionality
-    setupImagePreview();
+    // Setup image preview with web worker if available
+    setupImagePreviewWithWorker();
     // Setup character counter for description
     setupCharacterCounter();
 }
 
 // Function to get the logged in user
 function getLoggedInUser() {
-    // Use the proper IndexedDB user management system
-    checkIfUserLoggedIn().then((userName) => {
-        // If user name exists, set it as the logged-in user
-        if (userName && userName.value) {
-            loggedInUser = userName.value;
-            console.log("User logged in:", loggedInUser);
-            // Pre-fill the nickname field with the logged-in user's name
-            const nicknameField = document.getElementById("nickname");
-            if (nicknameField && loggedInUser) {
-                nicknameField.value = loggedInUser;
-                // Make the field readonly since they're logged in
-                nicknameField.readOnly = true;
-                nicknameField.style.backgroundColor = '#f3f4f6'; // Light gray background
-                nicknameField.title = 'This is your logged-in username';
+    // Use existing IndexedDB helper (checkIfUserLoggedIn / getUserName may exist in other scripts)
+    if (typeof checkIfUserLoggedIn === 'function') {
+        checkIfUserLoggedIn().then((userName) => {
+            if (userName && userName.value) {
+                loggedInUser = userName.value;
+                const nicknameField = document.getElementById("nickname");
+                if (nicknameField && loggedInUser) {
+                    nicknameField.value = loggedInUser;
+                    nicknameField.readOnly = true;
+                    nicknameField.style.backgroundColor = '#f3f4f6';
+                    nicknameField.title = 'This is your logged-in username';
+                }
             }
-        } else {
-            console.log("No user logged in - user can enter any nickname");
-            loggedInUser = null;
-            // Make sure the field is editable if no user is logged in
-            const nicknameField = document.getElementById("nickname");
-            if (nicknameField) {
-                nicknameField.readOnly = false;
-                nicknameField.style.backgroundColor = '';
-                nicknameField.title = '';
-                nicknameField.placeholder = 'Enter your nickname';
+        }).catch(() => { loggedInUser = null; });
+        return;
+    }
+
+    // Fallback if another helper exists (older artifact used getUserName())
+    if (typeof getUserName === 'function') {
+        getUserName().then((userName) => {
+            if (userName) {
+                loggedInUser = userName.value || userName;
+                const nicknameField = document.getElementById("nickname");
+                if (nicknameField && loggedInUser) {
+                    nicknameField.value = loggedInUser;
+                }
             }
-        }
-    }).catch((error) => {
-        console.log("No user logged in or error getting user:", error);
-        loggedInUser = null;
-        // Make sure the field is editable if there's an error
-        const nicknameField = document.getElementById("nickname");
-        if (nicknameField) {
-            nicknameField.readOnly = false;
-            nicknameField.style.backgroundColor = '';
-            nicknameField.title = '';
-            nicknameField.placeholder = 'Enter your nickname';
-        }
-    });
+        }).catch(() => { loggedInUser = null; });
+    }
 }
 
 // Function to check actual server connectivity
@@ -86,41 +79,117 @@ async function checkServerConnectivity() {
 }
 
 // Function to setup image preview functionality
-function setupImagePreview() {
-    console.log("Setting up image preview...");
+/**
+ * Initialize Web Worker for image processing
+ */
+function initializeWebWorker() {
+    if (window.Worker) {
+        try {
+            // Worker path assumes public is served as root, adjust if needed
+            imageWorker = new Worker('/javascripts/workers/imageWorker.js');
+
+            imageWorker.addEventListener('message', function(e) {
+                const { type } = e.data || {};
+
+                switch (type) {
+                    case 'COMPRESS_SUCCESS':
+                        console.log('Image compressed successfully');
+                        compressedImageBlob = e.data.blob || null;
+                        // log sizes if provided
+                        if (e.data.originalSize) console.log('Original size:', e.data.originalSize);
+                        if (e.data.compressedSize) console.log('Compressed size:', e.data.compressedSize);
+                        break;
+                    case 'VALIDATION_ERROR':
+                        console.error('Validation errors:', e.data.errors);
+                        if (Array.isArray(e.data.errors)) alert(e.data.errors.join('\n'));
+                        break;
+                    case 'VALIDATION_SUCCESS':
+                        console.log('Image validation passed');
+                        break;
+                    case 'THUMBNAIL_SUCCESS':
+                        console.log('Thumbnail generated');
+                        break;
+                    case 'ERROR':
+                        console.error('Worker error:', e.data.message);
+                        alert('Error processing image: ' + e.data.message);
+                        break;
+                    default:
+                        console.log('Worker message:', e.data);
+                }
+            });
+
+            imageWorker.addEventListener('error', function(ev) {
+                console.error('Web Worker error:', ev.message);
+            });
+
+            console.log('Web Worker initialized successfully');
+        } catch (err) {
+            console.warn('Failed to initialize worker:', err.message);
+            imageWorker = null;
+        }
+    } else {
+        console.warn('Web Workers not supported in this browser');
+    }
+}
+
+/**
+ * Setup image preview with Web Worker processing
+ */
+function setupImagePreviewWithWorker() {
     const photoInput = document.getElementById("photoID");
-    console.log("Photo input element:", photoInput);
-    
     if (photoInput) {
         photoInput.addEventListener("change", function(event) {
             const file = event.target.files[0];
-            const previewImg = document.getElementById("previewImg");
             const previewDiv = document.getElementById("imagePreview");
-            if (file && previewImg && previewDiv) {
+            const previewImg = document.getElementById("previewImg");
+
+            if (file && imageWorker) {
+                // Validate image using worker
+                try {
+                    imageWorker.postMessage({ type: 'VALIDATE_IMAGE', data: { name: file.name, size: file.size, type: file.type } });
+                } catch (err) {
+                    console.warn('Could not post VALIDATE_IMAGE to worker:', err.message);
+                }
+
+                // Show preview immediately
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    previewImg.src = e.target.result;
-                    previewDiv.classList.remove("hidden");
+                    if (previewImg && previewDiv) {
+                        previewImg.src = e.target.result;
+                        previewDiv.classList.remove('hidden');
+                    }
                 };
                 reader.readAsDataURL(file);
+
+                // Send original file to worker for compression
+                try {
+                    imageWorker.postMessage({ type: 'COMPRESS_IMAGE', data: { file: file, maxWidth: 800, maxHeight: 600, quality: 0.8 } });
+                } catch (err) {
+                    console.warn('Could not post COMPRESS_IMAGE to worker:', err.message);
+                }
+            } else if (file) {
+                // Fallback to inline preview if no worker
+                showImagePreview(file);
+                if (previewDiv) previewDiv.classList.remove('hidden');
             } else if (previewDiv) {
-                previewDiv.classList.add("hidden");
+                previewDiv.classList.add('hidden');
             }
         });
     }
 }
 
 // Function to setup character counter for description
+// Function to setup character counter for description
 function setupCharacterCounter() {
     const descriptionField = document.getElementById("description");
     const charCount = document.getElementById("charCount");
-    
+
     if (descriptionField && charCount) {
         // Update count on input
         descriptionField.addEventListener("input", function() {
             const count = descriptionField.value.length;
             charCount.textContent = count;
-            
+
             // Change color based on validation
             if (count < 10) {
                 charCount.parentElement.classList.add("text-red-500");
@@ -130,15 +199,17 @@ function setupCharacterCounter() {
                 charCount.parentElement.classList.remove("text-gray-500", "text-red-500");
             }
         });
-        
+
         // Initialize count
         charCount.textContent = descriptionField.value.length;
     }
 }
 
 // Function to register form submission event
+// Function to register form submission event
 function registerFormSubmit() {
-    const plantForm = document.getElementById("addPlantForm");
+    // keep backward compatibility: id might be addPlantForm or plantForm
+    const plantForm = document.getElementById("addPlantForm") || document.getElementById("plantForm");
     if (plantForm) {
         plantForm.addEventListener("submit", function(event) {
             event.preventDefault(); // Prevent default form submission
@@ -151,107 +222,108 @@ function registerFormSubmit() {
 }
 
 // Function to add new plant details
+// Function to add new plant details
 function addNewPlantDetails() {
-    console.log("Starting form submission...");
-    
     // Get values from the form fields
-    const plantName = document.getElementById("plantName").value;
-    const type = document.getElementById("type").value;
-    const description = document.getElementById("description").value;
-    const nickname = document.getElementById("nickname").value;
-    const photo = document.getElementById("photoID").files[0];
-
-    console.log("Form values:", {
-        plantName,
-        type,
-        description,
-        nickname,
-        photo: photo ? photo.name : "No photo selected"
-    });
+    const plantName = document.getElementById("plantName") ? document.getElementById("plantName").value : '';
+    const type = document.getElementById("type") ? document.getElementById("type").value : '';
+    const description = document.getElementById("description") ? document.getElementById("description").value : '';
+    const nickname = document.getElementById("nickname") ? document.getElementById("nickname").value : '';
+    const photoInput = document.getElementById("photoID");
+    const originalPhoto = photoInput && photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
 
     // Validate required fields
-    if (!plantName || !type || !description || !nickname) {
-        const missingFields = [];
-        if (!plantName) missingFields.push("Plant Name");
-        if (!type) missingFields.push("Plant Type");
-        if (!description) missingFields.push("Description");
-        if (!nickname) missingFields.push("Nickname");
-        
-        alert("Please fill in all required fields: " + missingFields.join(", "));
+    const missing = [];
+    if (!plantName) missing.push('Plant Name');
+    if (!type) missing.push('Plant Type');
+    if (!description) missing.push('Description');
+    if (!nickname) missing.push('Nickname');
+    if (missing.length) {
+        alert('Please fill in all required fields: ' + missing.join(', '));
         return;
     }
 
-    // Validate description length
     if (description.length < 10) {
-        alert("Description must be at least 10 characters long. Currently: " + description.length + " characters.");
+        alert('Description must be at least 10 characters long.');
         return;
     }
 
     if (description.length > 1000) {
-        alert("Description cannot exceed 1000 characters. Currently: " + description.length + " characters.");
+        alert('Description cannot exceed 1000 characters.');
         return;
     }
 
-    if (!photo) {
-        alert("Please select a photo for your plant.");
+    if (!originalPhoto && !compressedImageBlob) {
+        alert('Please select a photo for your plant.');
         return;
     }
 
-    // Create an object with the plant details
+    // Choose compressed blob if available, otherwise original file
+    const photoForUpload = compressedImageBlob || originalPhoto;
+
     const plantDetails = {
         plantName,
         type,
         description,
         nickname,
-        photo,
-        createdAt: new Date().toISOString() // Add timestamp for offline plants
+        photo: photoForUpload,
+        createdAt: new Date().toISOString()
     };
 
-    // Check if actually online by verifying server connectivity
-    checkServerConnectivity().then((isActuallyOnline) => {
-        if (isActuallyOnline) {
-            // If online, send the plant details to the server
-            console.log("✅ Online - Submitting plant to server");
+    // If offline, save metadata to sync DB; if online submit to server
+    if (navigator.onLine && typeof checkServerConnectivity === 'function') {
+        // Prefer to check server reachability before sending large payloads
+        checkServerConnectivity().then((isActuallyOnline) => {
+            if (isActuallyOnline) {
+                submitPlantDetails(plantDetails);
+            } else {
+                savePlantOffline(plantDetails, originalPhoto);
+            }
+        }).catch(() => {
+            // In case connectivity check fails, attempt submit if navigator.onLine
             submitPlantDetails(plantDetails);
-        } else {
-            // If offline, save the plant details to IndexedDB
-            console.log("❌ Offline - Saving plant locally for later sync");
-            // Note: We can't store the actual File object, so we'll store metadata
-            const timestamp = Date.now();
-            const tempId = `offline_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
-            
-            const offlinePlantDetails = {
-                ...plantDetails,
-                _id: tempId, // Add temporary ID for offline plants
-                photo: photo ? {
-                    name: photo.name,
-                    size: photo.size,
-                    type: photo.type,
-                    lastModified: photo.lastModified
-                } : null,
-                __isServerPlant: false,
-                __syncStatus: 'pending',
-                __createdOffline: true,
-                __lastSyncTime: null,
-                __tempId: tempId // Keep track of the temporary ID
-            };
-            
-            openSyncPlantIDB().then((db) => {
-                addNewPlantToSync (db, offlinePlantDetails).then((data) => {
-                    console.log("✅ Plant details saved offline for later sync");
-                    alert("🌱 Plant saved offline! It will be synced when you're back online.");
-                    // Redirect to homepage after saving
-                    window.location.href = "/";
-                }).catch((error) => {
-                    console.error("Error saving plant offline:", error);
-                    alert("❌ Error saving plant. Please try again.");
-                });
+        });
+    } else if (navigator.onLine) {
+        // No connectivity check available; attempt submit
+        submitPlantDetails(plantDetails);
+    } else {
+        savePlantOffline(plantDetails, originalPhoto);
+    }
+}
+
+function savePlantOffline(plantDetails, originalPhoto) {
+    // Save offline metadata and basic file info to IndexedDB for later sync
+    const timestamp = Date.now();
+    const tempId = `offline_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
+
+    const offlinePlantDetails = {
+        ...plantDetails,
+        _id: tempId,
+        photo: originalPhoto ? { name: originalPhoto.name, size: originalPhoto.size, type: originalPhoto.type, lastModified: originalPhoto.lastModified } : null,
+        __isServerPlant: false,
+        __syncStatus: 'pending',
+        __createdOffline: true,
+        __lastSyncTime: null,
+        __tempId: tempId
+    };
+
+    if (typeof openSyncPlantIDB === 'function' && typeof addNewPlantToSync === 'function') {
+        openSyncPlantIDB().then((db) => {
+            addNewPlantToSync(db, offlinePlantDetails).then(() => {
+                alert('🌱 Plant saved offline! It will be synced when you are back online.');
+                window.location.href = '/';
+            }).catch((err) => {
+                console.error('Error saving plant offline:', err);
+                alert('❌ Error saving plant offline. Please try again.');
             });
-        }
-    }).catch((error) => {
-        console.error("Error checking connectivity:", error);
-        alert("❌ Error checking connection. Please try again.");
-    });
+        }).catch((err) => {
+            console.error('Error opening sync DB:', err);
+            alert('❌ Error saving plant offline. Please try again.');
+        });
+    } else {
+        console.warn('Offline DB helpers not available; cannot save offline.');
+        alert('Unable to save offline on this device. Please try again when online.');
+    }
 }
 
 // Function to submit plant details to the server
