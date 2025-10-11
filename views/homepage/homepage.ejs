@@ -4,6 +4,7 @@
     <title>Plant Sharing Community</title>
     <link rel="stylesheet" href="/css/outputStyles.css" />
     <link rel="manifest" href="/manifest.json"/>
+    <script src="/javascripts/utils/connectivityCheck.js"></script>
     <script src="/javascripts/user/userIDBUtility.js"></script>
     <script src="/javascripts/user/userScript.js"></script>
     <script src="/javascripts/user/userRenderScript.js"></script>
@@ -45,12 +46,6 @@
                 </div>
             </div>
 
-                <!-- Queue counter -->
-                <div class="flex items-center gap-2 w-full lg:w-auto">
-                    <div class="badge badge-warning hidden" id="queue_counter">0</div>
-                    <span class="text-sm">items queued</span>
-                </div>
-
             <!--Add Plant Button-->
             <div class="flex items-center gap-2 w-full lg:w-auto">
                 <button 
@@ -73,19 +68,5 @@
     </div>
     <!--Include the online/offline mode component-->
     <%- include('../components/onlineOfflineMode.ejs') %>
-        <!-- Floating Sync Now button (bottom-left) -->
-        <div class="fixed bottom-10 left-10">
-            <button 
-                class="btn btn-primary btn-circle btn-lg shadow-2xl"
-                onclick="manualSync()"
-                id="sync_button"
-                aria-label="Sync Now"
-            >
-                <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
-                        d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                </svg>
-            </button>
-        </div>
 </body>
 </html>
