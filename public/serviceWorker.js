@@ -1,4 +1,4 @@
-const CACHE_NAME = 'plantpal-cache-v2';
+const CACHE_NAME = 'plantpal-cache-v8';
 
 console.log("Service Worker: Registered");
 
@@ -35,13 +35,15 @@ self.addEventListener("install", (event) => {
                 '/javascripts/homepage/homepageRenderScript.js',
                 '/javascripts/homepage/homepageScript.js',
                 "/javascripts/addPlant/addPlantScript.js",
-                "/javascripts/addPlant/addPlantIdbUtility.js",
+                "/javascripts/addPlant/addPlantUtility.js",
                 "/javascripts/chat/chatScript.js",
-                "/javascripts/chat/chatIdbUtility.js",
-                "/javascripts/chat/chatRenderingScript.js",
+                "/javascripts/chat/chatIDBUtility.js",
+                "/javascripts/chat/chatRenderScript.js",
+                "/javascripts/details/plantDetailsScript.js",
                 "/javascripts/user/userScript.js",
                 "/javascripts/user/userRenderScript.js",
-                "/javascripts/user/userIdbUtility.js",
+                "/javascripts/user/userIDBUtility.js",
+                "/javascripts/utils/connectivityCheck.js",
                 "/javascripts/workers/imageWorker.js"
             ],
             };
@@ -71,9 +73,9 @@ self.addEventListener("activate", (event) => {
     );
 });
 
-// Fetch event - serve from cache, fallback to network
+// Fetch event - intelligent caching strategy
 self.addEventListener("fetch", function (event) {
-    log(event.request.url);
+    const url = new URL(event.request.url);
     
     // Only handle GET requests for caching
     if (event.request.method !== 'GET') {
@@ -82,47 +84,83 @@ self.addEventListener("fetch", function (event) {
         return;
     }
     
-    event.respondWith(
-        fetch(event.request)
-        .then((response) => {
-            // Only cache successful GET responses
-            if (response.status === 200) {
-                // Clone the response before caching
-                const responseToCache = response.clone();
-                
-                // Cache the new response for future use
-                caches.open(CACHE_NAME).then((cache) => {
-                    cache.put(event.request, responseToCache);
-                }).catch((error) => {
-                    log("Cache put failed: " + error);
-                });
-            }
-            
-            return response;
-        })
-        .catch(() => {
-            return caches.match(event.request).then((response) => {
-            if (response) {
-                return response;
-            }
-            return getOfflinePage().then((response) => {
-                return (
-                response ||
-                get404Page().then(
-                    (response) =>
-                    response ||
-                    new Response(
-                        "You are offline and the requested content is not cached.",
+    // API calls: Network-first, no cache (data handled by IndexedDB)
+    const isAPICall = url.pathname.startsWith('/api/');
+    if (isAPICall) {
+        event.respondWith(
+            fetch(event.request)
+                .catch((error) => {
+                    log("API call failed (offline): " + url.pathname);
+                    // Return proper error response for offline API calls
+                    return new Response(
+                        JSON.stringify({ error: 'offline', message: 'No network connection' }),
                         {
-                        status: 404,
-                        statusText: "Not Found",
+                            status: 503,
+                            statusText: 'Service Unavailable',
+                            headers: { 'Content-Type': 'application/json' }
                         }
-                    )
-                )
-                );
-            });
-            });
-        })
+                    );
+                })
+        );
+        return;
+    }
+    
+    // Static assets: Cache-first strategy (fast offline experience)
+    event.respondWith(
+        caches.match(event.request)
+            .then((cachedResponse) => {
+                if (cachedResponse) {
+                    // Return cached version immediately
+                    log("Serving from cache: " + url.pathname);
+                    
+                    // Optionally update cache in background (stale-while-revalidate)
+                    if (navigator.onLine) {
+                        fetch(event.request)
+                            .then((networkResponse) => {
+                                if (networkResponse && networkResponse.status === 200) {
+                                    caches.open(CACHE_NAME).then((cache) => {
+                                        cache.put(event.request, networkResponse.clone());
+                                    });
+                                }
+                            })
+                            .catch(() => {
+                                // Ignore background update failures
+                            });
+                    }
+                    
+                    return cachedResponse;
+                }
+                
+                // Not in cache, fetch from network
+                return fetch(event.request)
+                    .then((response) => {
+                        // Cache successful responses
+                        if (response && response.status === 200) {
+                            const responseToCache = response.clone();
+                            caches.open(CACHE_NAME).then((cache) => {
+                                cache.put(event.request, responseToCache);
+                            });
+                        }
+                        return response;
+                    })
+                    .catch(() => {
+                        // Network failed and not in cache - show offline page
+                        log("Network failed for: " + url.pathname);
+                        return getOfflinePage().then((offlinePage) => {
+                            if (offlinePage) {
+                                return offlinePage;
+                            }
+                            return new Response(
+                                "You are offline and the requested content is not cached.",
+                                {
+                                    status: 503,
+                                    statusText: "Service Unavailable",
+                                    headers: { 'Content-Type': 'text/plain' }
+                                }
+                            );
+                        });
+                    });
+            })
     );
 });
 
