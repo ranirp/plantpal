@@ -3,6 +3,23 @@ let plantLists = []; // Variable to store the list of plants
 let currentFilter = 'all'; // Current filter type
 let currentSort = 'date'; // Current sort method
 
+// Update the UI counter that shows number of items queued for sync
+async function updateQueueCounter() {
+    try {
+        const syncDB = await openSyncPlantIDB();
+        const syncPlants = await getAllSyncPlants(syncDB) || [];
+        const counter = document.getElementById('queue_counter');
+        if (counter && syncPlants.length > 0) {
+            counter.textContent = syncPlants.length;
+            counter.classList.remove('hidden');
+        } else if (counter) {
+            counter.classList.add('hidden');
+        }
+    } catch (error) {
+        console.error('Error updating queue counter:', error);
+    }
+}
+
 // Function to navigate to the plant details page
 function showDetailsPage(id) {
     window.location.href = "/plantDetails/" + id + "/" + loggedInUser;
@@ -26,7 +43,7 @@ async function init() {
     }
 
     if (navigator.onLine) {
-        // Check if there are any plants that need to be sunced and update them
+        // Check if there are any plants that need to be synced and update them
         const isTherePlantsToSync = await checkIfThereIsSyncPlantAndUpdate();
         if (isTherePlantsToSync) {
             getPlantsFromServer(); // Fetch latest plants from server after sync
@@ -37,6 +54,8 @@ async function init() {
         listenForOnlineSync(); // Listen for online event to sync plants
     }
 
+    // Update queue counter on init (handles offline cached items)
+    await updateQueueCounter();
     // Function to check for offline-synced plants and update them
     async function checkIfThereIsSyncPlantAndUpdate() {
         return new Promise(async (resolve, reject) => {
@@ -114,6 +133,8 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                             await deleteSyncPlantFromIDB(db, plantId);
                             await addNewPlantToSync(db, updatedPlant);
                             console.log("Successfully updated plant sync status in IndexedDB");
+                            // After marking plant as synced, refresh the queue counter
+                            try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
                         }
                         
                         resolve();
@@ -221,7 +242,9 @@ async function addAllPlantsToIDB(plants) {
             syncedPlants: updatedPlants.filter(item => (item.value || item).__syncStatus === 'synced').length,
             pendingSync: updatedPlants.filter(item => (item.value || item).__syncStatus === 'pending').length
         };
-        console.log("IndexedDB Cache Statistics:", cacheStats);
+    console.log("IndexedDB Cache Statistics:", cacheStats);
+    // Refresh queue counter after updating cache
+    try { await updateQueueCounter(); } catch (e) { console.error('updateQueueCounter error:', e); }
         
     } catch (error) {
         console.error("Error updating IndexedDB cache:", error);
