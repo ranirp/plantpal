@@ -325,7 +325,11 @@ function changeOnlineStatus(isOnline) {
             
             // Show offline info and check if user can chat
             if (offlineInfo && offlineInfoText) {
+                console.log(`🔍 Checking offline chat permissions for plant ${plantId} and user ${loggedInUser}`);
+                
                 isUserOwnPlant(plantId, loggedInUser).then(canChatOffline => {
+                    console.log(`Offline chat permission result: ${canChatOffline ? 'ALLOWED' : 'DENIED'}`);
+                    
                     if (canChatOffline) {
                         offlineInfoText.textContent = "Offline: You can still message your own plant";
                         offlineInfo.classList.remove('hidden');
@@ -337,6 +341,12 @@ function changeOnlineStatus(isOnline) {
                         offlineInfo.classList.add('text-red-600');
                         offlineInfo.classList.remove('text-blue-600');
                     }
+                }).catch(error => {
+                    console.error('Error checking plant ownership for offline info:', error);
+                    offlineInfoText.textContent = "Offline: Limited chat functionality";
+                    offlineInfo.classList.remove('hidden');
+                    offlineInfo.classList.add('text-yellow-600');
+                    offlineInfo.classList.remove('text-blue-600', 'text-red-600');
                 });
             }
         }
@@ -381,7 +391,12 @@ async function sendMessage(isSuggestingName = false) {
         addChatToDB(chatMessage);
         socket.emit("chat", chatMessage);
     } else {
-        if (await isUserOwnPlant(plantId, loggedInUser)) {
+        console.log(`🔴 Offline mode detected. Checking if user ${loggedInUser} owns plant ${plantId}...`);
+        
+        const canChatOffline = await isUserOwnPlant(plantId, loggedInUser);
+        console.log(`Offline chat permission result: ${canChatOffline ? 'ALLOWED' : 'DENIED'}`);
+        
+        if (canChatOffline) {
             input.value = ""; 
             console.log("📱 Adding offline message to user's own plant:", chatMessage);
             
@@ -419,8 +434,10 @@ async function sendMessage(isSuggestingName = false) {
                 }
             }
         } else {
+            console.log(`❌ User ${loggedInUser} cannot send messages to plant ${plantId} in offline mode`);
+            
             if (typeof showNotification === 'function') {
-                showNotification("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.", 'info');
+                showNotification("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.", 'warning');
             } else {
                 alert("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.");
             }
@@ -432,25 +449,55 @@ async function sendMessage(isSuggestingName = false) {
 // Function to check if the current plant belongs to the logged-in user
 async function isUserOwnPlant(plantId, username) {
     try {
+        // First try to check online if we have connectivity
         if (navigator.onLine) {
-            const response = await fetch(`/plantDetails/checkOwnership/${plantId}/${username}`);
-            if (response.ok) {
-                const data = await response.json();
-                return data.isOwner;
+            try {
+                const response = await fetch(`/plantDetails/checkOwnership/${plantId}/${username}`);
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`🌐 Server ownership check for plant ${plantId}: ${data.isOwner ? 'OWNED' : 'NOT OWNED'}`);
+                    return data.isOwner;
+                }
+            } catch (serverError) {
+                console.log('Server ownership check failed, falling back to offline cache:', serverError.message);
             }
         }
         
+        // Fallback to offline IndexedDB check
         try {
+            console.log(`📱 Checking offline plant ownership for plant: ${plantId}, user: ${username}`);
+            
+            // Check in the main plants database first
             const db = await openSyncPlantIDB();
             const plants = await getAllSyncPlants(db);
-            const plant = plants.find(p => {
+            
+            console.log(`Found ${plants.length} plants in offline storage`);
+            
+            const ownedPlant = plants.find(p => {
                 const plantData = p.value || p;
-                return (plantData._id === plantId || p.id === plantId) && plantData.nickname === username;
+                const plantIdMatch = (plantData._id === plantId || plantData.id === plantId || p.id === plantId);
+                const userMatch = (plantData.nickname === username || plantData.username === username || plantData.addedBy === username);
+                
+                console.log(`Checking plant ${plantData._id || plantData.id || p.id}: ID match: ${plantIdMatch}, User match: ${userMatch}`);
+                console.log(`Plant data:`, { id: plantData._id || plantData.id, nickname: plantData.nickname, username: plantData.username, addedBy: plantData.addedBy });
+                
+                return plantIdMatch && userMatch;
             });
             
-            return !!plant;
+            const isOwned = !!ownedPlant;
+            console.log(`📦 Offline ownership check result: ${isOwned ? 'OWNED' : 'NOT OWNED'}`);
+            
+            if (isOwned) {
+                console.log(`✅ User ${username} owns plant ${plantId} (offline verification)`);
+            } else {
+                console.log(`❌ User ${username} does not own plant ${plantId} (offline verification)`);
+            }
+            
+            return isOwned;
+            
         } catch (idbError) {
-            console.log('IndexedDB fallback failed:', idbError);
+            console.error('IndexedDB fallback failed:', idbError);
+            // If we can't check ownership offline, be conservative and return false
             return false;
         }
     } catch (error) {
@@ -633,19 +680,20 @@ async function getChatHistory(plantID) {
         return;
     }
     
-    // Update the page to show we're fetching data
-    messageContainer.innerHTML = `
-        <div class="flex justify-center items-center p-4">
-            <div class="spinner"></div>
-            <span class="ml-2">Loading messages...</span>
-        </div>
-    `;
-
     console.log("Fetching chat history for plant:", plantID);
     
     // First check if we're online
     const isOnline = await checkServerConnectivity();
     
+    // Only show loading spinner if we're online and attempting server fetch
+    if (isOnline) {
+        messageContainer.innerHTML = `
+            <div class="flex justify-center items-center p-4">
+                <div class="spinner"></div>
+                <span class="ml-2">Loading messages...</span>
+            </div>
+        `;
+    }
     if (isOnline) {
         console.log("🌐 Online - fetching chat messages from server");
         
@@ -699,6 +747,7 @@ async function getChatHistory(plantID) {
                 chatMessages = cachedMessages;
                 renderChatMessages(chatMessages);
             } else {
+                console.log("No cached messages found, showing offline message");
                 await showOfflineMessage(messageContainer);
             }
         } catch (error) {
@@ -713,19 +762,33 @@ async function showOfflineMessage(container) {
         ? await checkServerConnectivity() 
         : navigator.onLine;
     
-    const message = isOnline 
-        ? 'No messages yet. Be the first to start the conversation!'
-        : "You're offline. Chat messages will be sent when you're back online.";
+    let message, iconClass, iconName;
     
-    const iconClass = isOnline ? 'text-blue-500' : 'text-yellow-500';
-    const iconName = isOnline ? 'fa-comments' : 'fa-exclamation-circle';
+    if (isOnline) {
+        message = 'No messages yet. Be the first to start the conversation!';
+        iconClass = 'text-blue-500';
+        iconName = 'fa-comments';
+    } else {
+        // Check if this is the user's own plant to customize message
+        const canChatOffline = await isUserOwnPlant(plantId, loggedInUser);
+        
+        if (canChatOffline) {
+            message = "You're offline, but you can still chat with your own plant. Messages will sync when you're back online.";
+            iconClass = 'text-blue-500';
+            iconName = 'fa-wifi';
+        } else {
+            message = "You're offline. No cached messages available for this plant.";
+            iconClass = 'text-yellow-500';
+            iconName = 'fa-exclamation-circle';
+        }
+    }
     
     container.innerHTML = `
         <div class="p-4 text-center">
             <div class="${iconClass}">
                 <i class="fas ${iconName} text-xl"></i>
             </div>
-            <p class="mt-2">
+            <p class="mt-2 text-gray-600">
                 ${message}
             </p>
         </div>
