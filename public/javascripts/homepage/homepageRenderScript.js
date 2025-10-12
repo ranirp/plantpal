@@ -8,6 +8,18 @@
 const placeHolderImage = '/images/placeholder.jpg';
 
 /**
+ * Format plant name with title case (first letter of each word capitalized)
+ * @param {string} name - Plant name to format
+ * @returns {string} Formatted plant name
+ */
+function formatPlantName(name) {
+    if (!name) return '';
+    return name.split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+/**
  * Generate unique temporary ID for offline plants.
  * Creates identifier from plant properties for consistent offline tracking.
  * 
@@ -52,6 +64,9 @@ function renderPlantList(plantList) {
     // Clear the container to avoid duplicates
     plantListContainer.innerHTML = '';
 
+    // Add grid classes for 3-column layout
+    plantListContainer.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-2 py-4";
+
     // Check if there are no plants to display
     if (plantList.length === 0) {
         console.log("No plants to display, showing empty message");
@@ -94,6 +109,7 @@ function renderPlantList(plantList) {
         // If plants exist, iterate through list and create a card for each plant
         plantList.forEach(function(plant) {
             const card = createdCard(plant);
+            card.className = card.className.replace('max-w-xs', '');
             plantListContainer.appendChild(card); 
         });
     }
@@ -129,14 +145,14 @@ function createdCard(plant) {
     const plantId = plant._id || plant.id || plant.plantId;
     const isOfflinePlant = !plantId || (typeof plantId === 'string' && plantId.startsWith('offline_'));
     
-    // Add classes for styling the card
-    let cardClasses = "card shadow-lg bg-white transition-shadow";
+    // Add classes for compact card styling 
+    let cardClasses = "w-full mx-auto bg-gray-200 border border-gray-400 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-300 overflow-hidden";
     if (isOfflinePlant) {
         // Offline plants get a different style and no hover effect
         cardClasses += " opacity-75 cursor-not-allowed border-2 border-dashed border-yellow-400";
     } else {
         // Online plants are clickable
-        cardClasses += " cursor-pointer hover:shadow-xl";
+        cardClasses += " cursor-pointer";
     }
     card.className = cardClasses;
     
@@ -152,13 +168,17 @@ function createdCard(plant) {
         } else {
             // For plants without any ID (corrupted data)
             console.error('Plant without any ID found:', plant);
-            alert('⚠️ Unable to view this plant.\n\nThis plant data appears to be incomplete. Please try refreshing the page.');
+            if (typeof showNotification === 'function') {
+                showNotification('⚠️ Unable to view this plant.\n\nThis plant data appears to be incomplete. Please try refreshing the page.', 'error');
+            } else {
+                alert('⚠️ Unable to view this plant.\n\nThis plant data appears to be incomplete. Please try refreshing the page.');
+            }
         }
     };
 
-    // Create figure for image
-    var figure = document.createElement('figure');
-    figure.className = "px-4 pt-4";
+    // Create image container with 3:2 aspect ratio
+    var imageContainer = document.createElement('div');
+    imageContainer.className = "w-full h-48 relative overflow-hidden";
 
     // Create an image element for the plant photo
     var img = document.createElement('img');
@@ -171,84 +191,46 @@ function createdCard(plant) {
         this.src = placeHolderImage;
     };
 
-    // Add classes for styling the image
-    img.className = "w-full h-48 object-cover rounded-lg";
+    // Add classes for styling the image 
+    img.className = "w-full h-full object-cover hover:scale-105 transition-transform duration-300";
 
-    // Append the image to the figure
-    figure.appendChild(img);
+    // Append the image to the container
+    imageContainer.appendChild(img);
 
-    // Create card body for plant details
-    var cardBody = document.createElement('div');
-    cardBody.className = "card-body p-4";
+    // Create compact details container
+    var detailsContainer = document.createElement('div');
+    detailsContainer.className = "p-2";
 
-    // Create and set the plant name
+    // Create and set the plant name - compact
     var title = document.createElement('h3');
-    title.className = "card-title text-lg font-bold";
-    title.textContent = plant.plantName;
+    title.className = "font-semibold text-gray-800 text-base mb-1 truncate";
+    title.textContent = formatPlantName(plant.plantName);
 
-    // Create badges container
-    var badgesContainer = document.createElement('div');
-    badgesContainer.className = "flex gap-2 mt-2 flex-wrap";
-    
-    // Create type badge
-    var typeBadge = document.createElement('div');
-    typeBadge.className = "badge badge-primary capitalize";
-    typeBadge.textContent = plant.type;
-    badgesContainer.appendChild(typeBadge);
-    
-    // Add sync status badge for offline plants
-    if (isOfflinePlant) {
-        var syncBadge = document.createElement('div');
-        syncBadge.className = "badge badge-warning gap-1";
-        syncBadge.innerHTML = '<i class="fas fa-sync-alt"></i> Pending Sync';
-        badgesContainer.appendChild(syncBadge);
-    }
-
-    // Create info container
-    var infoDiv = document.createElement('div');
-    infoDiv.className = "mt-3 space-y-1";
-
-    // Create and set the nickname
-    var nickname = document.createElement('p');
-    nickname.className = "text-sm text-gray-600";
-    nickname.innerHTML = '<i class="fas fa-user mr-2"></i>' + plant.nickname;
-
-    // Create and set the creation date
+    // Create date/time element - compact
     var dateElement = document.createElement('p');
-    dateElement.className = "text-sm text-gray-600";
+    dateElement.className = "text-sm text-gray-500";
     let formattedDate = 'Date not available';
-    if (plant.createdAt) {
+    let formattedTime = '';
+    
+    if (plant.createdAt || plant.dateAdded) {
         try {
-            formattedDate = new Date(plant.createdAt).toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            const date = new Date(plant.createdAt || plant.dateAdded);
+            formattedDate = date.toLocaleDateString();
+            formattedTime = date.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
         } catch (error) {
             console.error('Error formatting date for plant:', plant, error);
             formattedDate = 'Invalid date';
         }
     }
-    dateElement.innerHTML = '<i class="fas fa-calendar-alt mr-2"></i>' + formattedDate;
+    dateElement.textContent = `Date/Time: ${formattedDate} ${formattedTime}`;
 
-    // Create description preview
-    var description = document.createElement('p');
-    description.className = "text-sm text-gray-700 mt-2 line-clamp-2";
-    description.textContent = plant.description;
+    // Append elements to details container
+    detailsContainer.appendChild(title);
+    detailsContainer.appendChild(dateElement);
 
-    // Append elements to info div
-    infoDiv.appendChild(nickname);
-    infoDiv.appendChild(dateElement);
-
-    // Append all elements to card body
-    cardBody.appendChild(title);
-    cardBody.appendChild(badgesContainer);
-    cardBody.appendChild(infoDiv);
-    cardBody.appendChild(description);
-
-    // Append figure and card body to the card
-    card.appendChild(figure);
-    card.appendChild(cardBody);
+    // Append image container and details to the card
+    card.appendChild(imageContainer);
+    card.appendChild(detailsContainer);
 
     // Return the constructed card element
     return card;

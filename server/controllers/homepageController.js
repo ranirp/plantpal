@@ -14,7 +14,7 @@ const addPlant = require('../models/addPlantModel');
  */
 exports.homepage = async (req, res) => {
     res.render("homepage/homepage", { 
-        title: "Plant Sharing Community - Homepage",
+        title: "PlantPal - Homepage",
     });
 };
 

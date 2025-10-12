@@ -17,6 +17,61 @@ let currentFilter = 'all';
 let currentSort = 'date';
 
 /**
+ * Sort the plant list based on the selected criteria
+ * @param {string} sortBy - Sorting criteria ('date', 'name', or 'type')
+ */
+function sortList(sortBy) {
+    currentSort = sortBy;
+    
+    // Clone the array to avoid modifying the original
+    const sortedPlants = [...plantLists];
+    
+    switch(sortBy) {
+        case 'date':
+            sortedPlants.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+            break;
+        case 'name':
+            sortedPlants.sort((a, b) => a.name.localeCompare(b.name));
+            break;
+        case 'type':
+            sortedPlants.sort((a, b) => a.type.localeCompare(b.type));
+            break;
+        default:
+            // Default to date sort if invalid criteria
+            sortedPlants.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
+    
+    // Update the plantLists array with sorted data
+    plantLists = sortedPlants;
+    
+    // Re-render the plant list with the sorted data
+    renderPlantList(plantLists);
+    
+    // Update sort button text
+    const sortText = document.getElementById('sortText');
+    if (sortText) {
+        sortText.textContent = `Sort by ${sortBy}`;
+    }
+}
+
+// Add click event listeners to sort buttons when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    const sortDateBtn = document.getElementById('sortDate');
+    const sortNameBtn = document.getElementById('sortName');
+    const sortTypeBtn = document.getElementById('sortType');
+    
+    if (sortDateBtn) {
+        sortDateBtn.addEventListener('click', () => sortList('date'));
+    }
+    if (sortNameBtn) {
+        sortNameBtn.addEventListener('click', () => sortList('name'));
+    }
+    if (sortTypeBtn) {
+        sortTypeBtn.addEventListener('click', () => sortList('type'));
+    }
+});
+
+/**
  * Update the sync queue counter badge in the UI.
  * Displays number of plants pending upload when back online.
  */
@@ -534,13 +589,29 @@ function filterByType() {
 }
 
 // Function to sort plant list
-function sortList(sortType) {
+function sortPlants(sortType) {
     currentSort = sortType;
     
-    // Update button styles to show active sort
-    const sortButtons = document.querySelectorAll('.btn-group .btn');
-    sortButtons.forEach(btn => {
-        btn.classList.remove('btn-active');
+    // Get all plants and convert to array for sorting
+    const plants = Array.from(document.querySelectorAll('#plantList > div')).filter(div => div.querySelector('h3')); // Only get plant cards
+    
+    plants.sort((a, b) => {
+        switch(sortType.toLowerCase()) {
+            case 'name':
+                const nameA = a.querySelector('h3').textContent;
+                const nameB = b.querySelector('h3').textContent;
+                return nameA.localeCompare(nameB);
+            
+            case 'type':
+                const typeA = a.querySelector('.badge')?.textContent || '';
+                const typeB = b.querySelector('.badge')?.textContent || '';
+                return typeA.localeCompare(typeB);
+            
+            case 'date':
+                const dateA = new Date(a.querySelector('.text-xs').textContent.split(': ')[1]);
+                const dateB = new Date(b.querySelector('.text-xs').textContent.split(': ')[1]);
+                return dateB - dateA; // Most recent first
+        }
     });
     
     // Find and activate the clicked button

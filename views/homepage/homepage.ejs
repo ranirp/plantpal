@@ -39,6 +39,7 @@
     
     <!-- Scripts -->
     <script src="/javascripts/utils/connectivityCheck.js" defer></script>
+    <script src="/javascripts/utils/notificationUtility.js" defer></script>
     <script src="/javascripts/user/userIDBUtility.js" defer></script>
     <script src="/javascripts/user/userScript.js" defer></script>
     <script src="/javascripts/user/userRenderScript.js" defer></script>
@@ -81,7 +82,7 @@
     <div class="flex flex-col min-h-screen pt-20">
 
         <!--Filter and sort controls-->
-        <div class="bg-white shadow-md p-4 flex flex-col lg:flex-row gap-4 items-center justify-between">
+        <div class="bg-base-100 shadow-md p-4 flex flex-col lg:flex-row gap-4 items-center justify-between">
             <!--Filter by type-->
             <div class="flex items-center gap-2 w-full lg:w-auto">
                 <label for="typeFilter" class="font-bold text-gray-700 text-sm lg:text-base whitespace-nowrap">Filter:</label>
@@ -97,18 +98,23 @@
                 </select>
             </div>
 
-            <!--Sort Controls-->
-            <div class="flex items-center gap-2 w-full lg:w-auto">
-                <label for="sortOptions" class="font-bold text-gray-700 text-sm lg:text-base whitespace-nowrap">Sort:</label>
-                <div class="btn-group">
-                    <button class="btn btn-sm btn-neutral text-xs lg:text-sm" onclick="sortPlants('date')">Date</button>
-                    <button class="btn btn-sm btn-neutral text-xs lg:text-sm" onclick="sortPlants('type')">Type</button>
-                    <button class="btn btn-sm btn-neutral text-xs lg:text-sm" onclick="sortPlants('name')">Name</button>
+            <!--Controls -->
+            <div class="flex items-center gap-4 w-full lg:w-auto">
+                <!--Sort Controls-->
+                <div class="dropdown dropdown-bottom">
+                    <div tabindex="0" role="button" aria-label="Sort options" class="btn btn-circle bg-gray-200 text-gray-600 border-2 border-gray-400 shadow-sm hover:bg-gray-300">
+                        <svg class="w-8 h-8" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+                            <path fill="currentColor" d="M3.9 54.9C10.5 40.9 24.5 32 40 32H472c15.5 0 29.5 8.9 36.1 22.9s4.6 30.5-5.2 42.5L320 320.9V448c0 12.1-6.8 23.2-17.7 28.6s-23.8 4.3-33.5-3l-64-48c-8.1-6-12.8-15.5-12.8-25.6V320.9L9 97.3C-.7 85.4-2.8 68.8 3.9 54.9z"/>
+                        </svg>
+                    </div>
+                    <ul tabindex="0" class="dropdown-content z-50 menu p-2 shadow bg-base-100 rounded-box w-48">
+                        <li><a onclick="sortList('date')" class="whitespace-nowrap text-base">Sort By Date</a></li>
+                        <li><a onclick="sortList('name')" class="whitespace-nowrap text-base">Sort By Name</a></li>
+                        <li><a onclick="sortList('type')" class="whitespace-nowrap text-base">Sort By Type</a></li>
+                    </ul>
                 </div>
-            </div>
 
-            <!--Add Plant Button-->
-            <div class="flex items-center gap-2 w-full lg:w-auto">
+                <!--Add Plant Button-->
                 <button 
                     class="btn btn-primary w-full lg:w-auto text-sm lg:text-base"
                     onclick="openAddPlantPage()"
