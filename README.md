@@ -39,6 +39,25 @@ Before you begin, ensure you have the following installed:
 
 ## 🚀 Installation
 
+### Quick Setup (Recommended)
+
+For a fast setup, use the provided setup script:
+
+```bash
+git clone https://github.com/ranirp/plantpal.git
+cd plantpal
+chmod +x setup.sh
+./setup.sh
+```
+
+This script will:
+- Create `.env` file from template
+- Install all dependencies
+- Check MongoDB availability
+- Provide next steps
+
+### Manual Setup
+
 ### Step 1: Clone the Repository
 
 ```bash
@@ -61,8 +80,57 @@ This will install all required packages listed in `package.json`:
 - Canvas for image processing
 - And all other dependencies
 
+### Step 3: Environment Configuration
+
+**⚠️ IMPORTANT:** You must create an environment file before running the application.
+
+1. **Copy the environment template:**
+   ```bash
+   cp .env.example .env
+   ```
+
+2. **Configure your MongoDB connection:**
+   
+   Open `.env` file and update the `MONGO_DB` value:
+
+   **For Local MongoDB:**
+   ```env
+   MONGO_DB=mongodb://localhost:27017/plantpal
+   ```
+
+   **For MongoDB Atlas (Cloud):**
+   ```env
+   MONGO_DB=mongodb+srv://username:password@cluster.mongodb.net/plantpal?retryWrites=true&w=majority
+   ```
+   
+   Replace `username`, `password`, and `cluster` with your actual MongoDB Atlas credentials.
+
+3. **Verify other settings:**
+   ```env
+   NODE_ENV=development
+   PORT=3001
+   ```
+
 
 ## 🏃‍♂️ Running the Project
+
+### Before Starting - MongoDB Setup
+
+**Make sure MongoDB is running before starting the application:**
+
+**Local MongoDB:**
+```bash
+# macOS (using Homebrew)
+brew services start mongodb-community
+
+# Ubuntu/Debian
+sudo systemctl start mongod
+
+# Windows
+net start MongoDB
+```
+
+**MongoDB Atlas:** No local setup needed, just ensure your connection string in `.env` is correct.
 
 ### Method 1: Development Mode (Recommended)
 
@@ -126,6 +194,48 @@ Once both commands are running:
 3. Add your IP address to the whitelist
 4. Create a database user
 5. Copy the connection string to your `.env` file
+
+## 🚨 Troubleshooting
+
+### Common Issues
+
+**1. MongoDB Connection Error:**
+```
+Error connecting to MongoDB: The `uri` parameter to `openUri()` must be a string, got "undefined"
+```
+**Solution:** Make sure you have created the `.env` file from `.env.example` and set the `MONGO_DB` variable.
+
+**2. MongoDB Not Running:**
+```
+Error connecting to MongoDB: connect ECONNREFUSED 127.0.0.1:27017
+```
+**Solution:** Start your local MongoDB service or check your Atlas connection string.
+
+**3. Port Already in Use:**
+```
+Error: listen EADDRINUSE: address already in use :::3001
+```
+**Solution:** Kill the process using port 3001 or change the PORT in your `.env` file.
+
+**4. Missing Environment File:**
+```
+Cannot find module 'dotenv'
+```
+**Solution:** Run `npm install` to install dependencies, then create `.env` from `.env.example`.
+
+### Health Check
+
+Once the server is running, you can check if everything is working:
+```bash
+curl http://localhost:3001/health
+```
+
+You should see output like:
+```
+🌱 Plant Sharing Community server running on port 3001
+✅ Successfully connected to MongoDB
+🔄 Mongoose connection established
+```
 
 ### PWA Installation
 

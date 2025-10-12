@@ -4,6 +4,7 @@
   "description": "Progressive Web App for Sheffield Plant Sharing Community",
   "main": "server.js",
   "scripts": {
+    "setup": "./setup.sh",
     "start": "node app.js",
     "dev": "nodemon app.js",
     "tailwind": "npx tailwindcss -i ./public/css/inputStyles.css -o ./public/css/outputStyles.css --watch",
