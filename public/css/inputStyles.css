@@ -1,21 +1,30 @@
+/* Import Roboto font from Google Fonts */
 @import url("https://fonts.googleapis.com/css?family=Roboto:300,400,500,700,900&display=swap");
+
+/* Include Tailwind's base styles */
 @tailwind base;
 
+/* Define base styles for light and dark mode */
 @layer base {
+    /* Light mode - default theme */
     html {
         @apply text-gray-800;
         @apply bg-white;
     }
+    /* Dark mode - activated when .dark class is present */
     html.dark {
         @apply text-neutral-50;
         @apply bg-gray-900;
     }
 }
 
+/* Include Tailwind's component and utility styles */
 @tailwind components;
 @tailwind utilities;
 
+/* Custom utility classes */
 @layer utilities {
+    /* Limit text to 2 lines with ellipsis */
     .line-clamp-2 {
         display: -webkit-box;
         -webkit-line-clamp: 2;
@@ -23,6 +32,7 @@
         overflow: hidden;
     }
     
+    /* Limit text to 3 lines with ellipsis */
     .line-clamp-3 {
         display: -webkit-box;
         -webkit-line-clamp: 3;
@@ -31,6 +41,7 @@
     }
 }
 
+/* Global paragraph styles */
 p {
     @apply leading-[1.6];
 }
