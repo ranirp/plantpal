@@ -50,7 +50,7 @@ function recordSubmission(ip) {
  */
 exports.addPlantPage = (req, res, next) => {
     res.render("addPlant/addPlant", { 
-        title: "Share your Plant",
+        title: "PlantPal - Add Plant Form",
     });
 };
 

@@ -79,14 +79,14 @@ function initializeWebWorker() {
                         compressedImageBlob = e.data.blob || null;
                         break;
                     case 'VALIDATION_ERROR':
-                        if (Array.isArray(e.data.errors)) alert(e.data.errors.join('\n'));
+                        if (Array.isArray(e.data.errors)) showNotification(e.data.errors.join('\n'), 'error');
                         break;
                     case 'VALIDATION_SUCCESS':
                         break;
                     case 'THUMBNAIL_SUCCESS':
                         break;
                     case 'ERROR':
-                        alert('Error processing image: ' + e.data.message);
+                        showNotification('Error processing image: ' + e.data.message, 'error');
                         break;
                 }
             });
@@ -213,17 +213,17 @@ function addNewPlantDetails() {
     if (!description) missing.push('Description');
     if (!nickname) missing.push('Nickname');
     if (missing.length) {
-        alert('Please fill in all required fields: ' + missing.join(', '));
+        showNotification('Please fill in all required fields: ' + missing.join(', '), 'info');
         resetFormState();
         return;
     }
     if (description.length < 10) {
-        alert('Description must be at least 10 characters long.');
+        showNotification('Description must be at least 10 characters long.', 'info');
         resetFormState();
         return;
     }
     if (description.length > 1000) {
-        alert('Description cannot exceed 1000 characters.');
+        showNotification('Description cannot exceed 1000 characters.', 'info');
         resetFormState();
         return;
     }
@@ -283,19 +283,20 @@ function savePlantOffline(plantDetails, originalPhoto, resetFormState) {
         openSyncPlantIDB().then((db) => {
             addNewPlantToSync(db, offlinePlantDetails).then(() => {
                 resetFormState();
-                alert('🌱 Plant saved offline! It will be synced when you are back online.');
-                window.location.href = '/';
+                showNotification('🌱 Plant saved offline! It will be synced when you are back online.', 'success', () => {
+                    window.location.href = '/';
+                });
             }).catch(() => {
                 resetFormState();
-                alert('❌ Error saving plant offline. Please try again.');
+                showNotification('❌ Error saving plant offline. Please try again.', 'error');
             });
         }).catch(() => {
             resetFormState();
-            alert('❌ Error saving plant offline. Please try again.');
+            showNotification('❌ Error saving plant offline. Please try again.', 'error');
         });
     } else {
         resetFormState();
-        alert('Unable to save offline on this device. Please try again when online.');
+        showNotification('Unable to save offline on this device. Please try again when online.', 'error');
     }
 }
 
@@ -329,12 +330,16 @@ function submitPlantDetails(plantDetails, resetFormState) {
     })
     .then(() => {
         resetFormState();
-        alert("🌱 Plant shared successfully!");
-        window.location.href = "/";
-    })
+        showNotification("🌱 Plant shared successfully!", 'success', () => {
+            window.location.href = "/";
+        });
+    }, 500)
     .catch(error => {
         resetFormState();
-        alert("❌ " + error.message + "\n\nPlease check your input and try again.");
+        // Clean up error message to avoid showing localhost URL
+        const errorMessage = error.message.replace(/https?:\/\/[^\/]+/g, '');
+        showNotification("❌ Error: Please check your input and try again.", 'error');
+        console.error('Submission error:', errorMessage);
     });
 }
 

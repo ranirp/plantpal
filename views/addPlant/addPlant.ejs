@@ -27,13 +27,14 @@
 %>
 
 <!DOCTYPE html>
-<html data-theme="cupcake">
+<html data-theme="cupcake" class="add-plant-root">
     <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="PlantPal - Add Plant Form">
     <title>PlantPal - Add Plant Form</title>
         <link rel="stylesheet" href="/css/outputStyles.css" />
+        <link rel="manifest" href="/manifest.json"/>
         <link 
             rel="stylesheet" 
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" 
@@ -41,128 +42,121 @@
             onload="this.media='all'" 
         />
         <script src="/javascripts/utils/connectivityCheck.js" defer></script>
+        <script src="/javascripts/utils/notificationUtility.js" defer></script>
         <script src="/javascripts/addPlant/addPlantScript.js" defer></script>
         <script src="/javascripts/addPlant/addPlantUtility.js" defer></script>
         <script src="/javascripts/user/userScript.js" defer></script>
         <script src="/javascripts/user/userIDBUtility.js"></script>
     </head>
-    <body onload="init()" class="min-h-screen bg-gray-50">
-        <div class="container mx-auto max-w-7xl mt-16 px-4 py-8">
-            <div class="bg-white shadow-xl rounded-xl overflow-hidden">
-                <div class="grid grid-cols-1 lg:grid-cols-2 min-h-[700px]">
-                    <!-- Plant Illustration -->
-                    <div class="bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center p-8 lg:p-12">
-                        <div class="text-center">
-                            <img src="/images/addplant.jpg" alt="Plant Illustration" class="max-w-full h-auto max-h-80 lg:max-h-96 mx-auto rounded-lg shadow-lg" />
-                        </div>
+    <body onload="init()" class="bg-base-100 add-plant-page">
+        <div class="form-container">
+            <!-- Illustration Side -->
+            <div class="illustration-side">
+                <img src="/images/addplant.jpg" alt="Plant Illustration" />
+            </div>
+            
+            <!-- Form Side -->
+            <div class="form-side">
+                <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">Share Your Plant</h1>
+                
+                <form method="POST" enctype="multipart/form-data" id="addPlantForm" class="space-y-4">
+
+                <!-- Plant Name -->
+                <div>
+                    <label for="plantName" class="block text-sm font-semibold text-gray-700 mb-1">Plant Name:</label>
+                    <input 
+                        type="text" 
+                        id="plantName" 
+                        name="plantName" 
+                        class="input input-bordered w-full rounded-md text-sm" 
+                        required 
+                        placeholder="Enter plant name"
+                    />
+                </div>
+
+                <!-- Plant Type -->
+                <div>
+                    <label for="type" class="block text-sm font-semibold text-gray-700 mb-1">Plant Type:</label>
+                    <select 
+                        id="type" 
+                        name="type" 
+                        class="select select-bordered w-full rounded-md text-sm" 
+                        required
+                    >
+                        <option value="" disabled selected>Select a plant type</option>
+                        <option value="succulent">Succulent</option>
+                        <option value="fern">Fern</option>
+                        <option value="houseplant">Houseplant</option>
+                        <option value="vegetable">Vegetable</option>
+                        <option value="flowering">Flowering</option>
+                        <option value="herb">Herb</option>
+                        <option value="other">Other</option> 
+                    </select>
+                </div>
+
+                <!-- Plant Description -->
+                <div>
+                    <label for="description" class="block text-sm font-semibold text-gray-700 mb-1">
+                        Description: <span class="text-xs text-gray-500">(minimum 10 characters)</span>
+                    </label>
+                    <textarea 
+                        id="description" 
+                        name="description" 
+                        class="textarea textarea-bordered w-full rounded-md resize-none text-sm" 
+                        rows="3" 
+                        required
+                        minlength="10"
+                        maxlength="1000"
+                        placeholder="Share care tips, growing conditions, or other details about your plant (at least 10 characters)"
+                    ></textarea>
+                    <div class="text-xs text-gray-500 mt-1">
+                        <span id="charCount">0</span> / 1000 characters
                     </div>
-                    
-                    <!-- Form -->
-                    <div class="flex items-center justify-center p-8 lg:p-12">
-                        <div class="w-full max-w-md">
-                            <h1 class="text-3xl font-bold text-gray-800 mb-8 text-center">Share Your Plant</h1>
-                            
-                            <form method="POST" enctype="multipart/form-data" id="addPlantForm" class="space-y-4">
+                </div>
 
-                            <!-- Plant Name -->
-                            <div>
-                                <label for="plantName" class="block text-sm font-semibold text-gray-700 mb-1">Plant Name:</label>
-                                <input 
-                                    type="text" 
-                                    id="plantName" 
-                                    name="plantName" 
-                                    class="input input-bordered w-full rounded-md text-sm" 
-                                    required 
-                                    placeholder="Enter plant name"
-                                />
-                            </div>
-
-                            <!-- Plant Type -->
-                            <div>
-                                <label for="type" class="block text-sm font-semibold text-gray-700 mb-1">Plant Type:</label>
-                                <select 
-                                    id="type" 
-                                    name="type" 
-                                    class="select select-bordered w-full rounded-md text-sm" 
-                                    required
-                                >
-                                    <option value="" disabled selected>Select a plant type</option>
-                                    <option value="succulent">Succulent</option>
-                                    <option value="fern">Fern</option>
-                                    <option value="houseplant">Houseplant</option>
-                                    <option value="vegetable">Vegetable</option>
-                                    <option value="flowering">Flowering</option>
-                                    <option value="herb">Herb</option>
-                                    <option value="other">Other</option> 
-                                </select>
-                            </div>
-
-                            <!-- Plant Description -->
-                            <div>
-                                <label for="description" class="block text-sm font-semibold text-gray-700 mb-1">
-                                    Description: <span class="text-xs text-gray-500">(minimum 10 characters)</span>
-                                </label>
-                                <textarea 
-                                    id="description" 
-                                    name="description" 
-                                    class="textarea textarea-bordered w-full rounded-md resize-none text-sm" 
-                                    rows="3" 
-                                    required
-                                    minlength="10"
-                                    maxlength="1000"
-                                    placeholder="Share care tips, growing conditions, or other details about your plant (at least 10 characters)"
-                                ></textarea>
-                                <div class="text-xs text-gray-500 mt-1">
-                                    <span id="charCount">0</span> / 1000 characters
-                                </div>
-                            </div>
-
-                            <!-- Plant Photo Upload -->
-                            <div>
-                                <label for="photoID" class="block text-sm font-semibold text-gray-700 mb-1">
-                                    Upload Photo: <span class="text-xs text-gray-500">(optional)</span>
-                                </label>
-                                <input 
-                                    type="file" 
-                                    id="photoID" 
-                                    name="photo" 
-                                    accept="image/*" 
-                                    class="file-input file-input-bordered w-full rounded-md text-sm"
-                                />
-                                <div class="text-xs text-gray-500 mt-1">
-                                    You can share your plant without a photo, or add one to help others identify it
-                                </div>
-                                <div id="imagePreview" class="mt-2 hidden">
-                                    <div class="bg-gray-50 border-2 border-dashed border-gray-300 rounded-md p-2 text-center">
-                                        <img id="previewImg" alt="Image Preview" class="max-h-24 max-w-full mx-auto object-contain rounded-md" />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- User Nickname -->
-                            <div>
-                                <label for="nickname" class="block text-sm font-semibold text-gray-700 mb-1">Your Nickname:</label>
-                                <input 
-                                    type="text" 
-                                    id="nickname" 
-                                    name="nickname" 
-                                    class="input input-bordered w-full rounded-md text-sm" 
-                                    required 
-                                    placeholder="Enter your nickname"
-                                />
-                            </div>
-
-                            <!-- Submit Button -->
-                            <div class="pt-4">
-                                <button type="submit" class="btn btn-primary w-full rounded-md text-white py-3 font-semibold hover:bg-primary-focus transition-colors">
-                                    <i class="fas fa-leaf mr-2"></i>
-                                    Share Plant
-                                </button>
-                            </div>
-                            </form>
+                <!-- Plant Photo Upload -->
+                <div>
+                    <label for="photoID" class="block text-sm font-semibold text-gray-700 mb-1">
+                        Upload Photo: <span class="text-xs text-gray-500">(optional)</span>
+                    </label>
+                    <input 
+                        type="file" 
+                        id="photoID" 
+                        name="photo" 
+                        accept="image/*" 
+                        class="file-input file-input-bordered w-full rounded-md text-sm"
+                    />
+                    <div class="text-xs text-gray-500 mt-1">
+                        You can share your plant without a photo, or add one to help others identify it
+                    </div>
+                    <div id="imagePreview" class="mt-2 hidden">
+                        <div class="bg-gray-50 border-2 border-dashed border-gray-300 rounded-md p-2 text-center">
+                            <img id="previewImg" alt="Image Preview" class="max-h-24 max-w-full mx-auto object-contain rounded-md" />
                         </div>
                     </div>
                 </div>
+
+                <!-- User Nickname -->
+                <div>
+                    <label for="nickname" class="block text-sm font-semibold text-gray-700 mb-1">Your Nickname:</label>
+                    <input 
+                        type="text" 
+                        id="nickname" 
+                        name="nickname" 
+                        class="input input-bordered w-full rounded-md text-sm" 
+                        required 
+                        placeholder="Enter your nickname"
+                    />
+                </div>
+
+                <!-- Submit Button -->
+                <div class="pt-4">
+                    <button type="submit" class="btn btn-primary w-full rounded-md text-white py-3 font-semibold hover:bg-primary-focus transition-colors">
+                        <i class="fas fa-leaf mr-2"></i>
+                        Share Plant
+                    </button>
+                </div>
+                </form>
             </div>
         </div>
 
