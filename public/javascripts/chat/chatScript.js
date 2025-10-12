@@ -23,8 +23,22 @@ let lastStatusUpdate = null;
  * Delays initialization to ensure all required scripts are loaded.
  * Creates socket connection and calls init function when ready.
  */
+/**
+ * Update chat header with formatted plant name
+ */
+function updateChatHeader() {
+    const chatHeaderElement = document.querySelector('.text-xl.font-medium');
+    if (chatHeaderElement) {
+        const plantName = chatHeaderElement.textContent.replace('Chat on: ', '').trim();
+        chatHeaderElement.textContent = `Chat on: ${formatPlantName(plantName)}`;
+    }
+}
+
 document.addEventListener('DOMContentLoaded', function() {
     console.log("Chat DOM loaded, waiting for scripts to initialize...");
+    
+    // Format plant name in chat header
+    updateChatHeader();
     
     // Delay initialization to ensure dependencies are loaded
     setTimeout(() => {
@@ -76,7 +90,7 @@ async function initializeSocket() {
         const hasConnectivity = await checkServerConnectivity();
         console.log(`Server connectivity check: ${hasConnectivity ? 'ONLINE' : 'OFFLINE'}`);
         
-        // Initialize socket with improved connection options
+        // Initialize socket with improved connection options and path-relative URL
         socket = io({
             autoConnect: true,
             reconnection: true,
@@ -84,6 +98,8 @@ async function initializeSocket() {
             reconnectionDelayMax: 10000,  
             reconnectionAttempts: 5,      
             timeout: 20000,
+            forceNew: true,
+            transports: ['websocket', 'polling'],
             forceNew: false,
             transports: ['websocket', 'polling']
         });
@@ -396,10 +412,18 @@ async function sendMessage(isSuggestingName = false) {
                 
             } catch (error) {
                 console.error("❌ Error saving offline message:", error);
-                alert("Failed to save your message for later sync. Please try again.");
+                if (typeof showNotification === 'function') {
+                    showNotification("Failed to save your message for later sync. Please try again.", 'error');
+                } else {
+                    alert("Failed to save your message for later sync. Please try again.");
+                }
             }
         } else {
-            alert("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.");
+            if (typeof showNotification === 'function') {
+                showNotification("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.", 'info');
+            } else {
+                alert("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.");
+            }
             return;
         }
     }
@@ -585,6 +609,22 @@ function joinPlantChatRoom() {
     socket.emit("createorjoin", roomNo, name);
 }
 
+/**
+ * Format plant name with title case (first letter of each word capitalized)
+ * @param {string} name - Plant name to format
+ * @returns {string} Formatted plant name
+ */
+function formatPlantName(name) {
+    if (!name) return '';
+    return name.split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+/**
+ * Process plant form submission.
+ */
+
 async function getChatHistory(plantID) {
     let messageContainer = document.getElementById("chatMessages");
     
@@ -641,11 +681,11 @@ async function getChatHistory(plantID) {
                         chatMessages = cachedMessages;
                         renderChatMessages(chatMessages);
                     } else {
-                        showOfflineMessage(messageContainer);
+                        await showOfflineMessage(messageContainer);
                     }
                 } catch (cacheError) {
                     console.error("❌ Error retrieving cached messages:", cacheError);
-                    showOfflineMessage(messageContainer);
+                    await showOfflineMessage(messageContainer);
                 }
             });
     } else {
@@ -659,23 +699,34 @@ async function getChatHistory(plantID) {
                 chatMessages = cachedMessages;
                 renderChatMessages(chatMessages);
             } else {
-                showOfflineMessage(messageContainer);
+                await showOfflineMessage(messageContainer);
             }
         } catch (error) {
             console.error("❌ Error retrieving cached messages:", error);
-            showOfflineMessage(messageContainer);
+            await showOfflineMessage(messageContainer);
         }
     }
 }
 
-function showOfflineMessage(container) {
+async function showOfflineMessage(container) {
+    const isOnline = typeof checkServerConnectivity === 'function' 
+        ? await checkServerConnectivity() 
+        : navigator.onLine;
+    
+    const message = isOnline 
+        ? 'No messages yet. Be the first to start the conversation!'
+        : "You're offline. Chat messages will be sent when you're back online.";
+    
+    const iconClass = isOnline ? 'text-blue-500' : 'text-yellow-500';
+    const iconName = isOnline ? 'fa-comments' : 'fa-exclamation-circle';
+    
     container.innerHTML = `
         <div class="p-4 text-center">
-            <div class="text-yellow-500">
-                <i class="fas fa-exclamation-circle text-xl"></i>
+            <div class="${iconClass}">
+                <i class="fas ${iconName} text-xl"></i>
             </div>
             <p class="mt-2">
-                You're offline. Chat messages will be sent when you're back online.
+                ${message}
             </p>
         </div>
     `;

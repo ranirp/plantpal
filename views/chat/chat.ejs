@@ -26,7 +26,7 @@
 %>
 
 <!DOCTYPE html>
-<html data-theme="cupcake">
+<html data-theme="cupcake" class="bg-base-100">
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -36,6 +36,7 @@
     <link rel="manifest" href="/manifest.json"/>
     <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" defer></script>
     <script src="/javascripts/utils/connectivityCheck.js" defer></script>
+    <script src="/javascripts/utils/notificationUtility.js" defer></script>
     <script src="/javascripts/user/userScript.js" defer></script>
     <script src="/javascripts/chat/chatScript.js" defer></script>
     <script src="/javascripts/chat/chatRenderScript.js" defer></script>
@@ -43,20 +44,18 @@
     <script src="/javascripts/user/userRenderScript.js" defer></script>
     <script src="/tw-elements/dist/js/tw-elements.umd.min.js" defer></script>
 </head>
-<body>
-
+<body class="min-h-screen bg-base-100">
 <script>
     var plantId = '<%= data._id %>';
     var loggedInUser = '<%= username || data.nickname || "Guest" %>';
 </script>
 
-<div class="flex flex-col h-full">
-    <!-- Chat Header -->
-    <div class="bg-gray-100 p-4 rounded-t-lg border border-gray-300">
+<div class="flex flex-col h-full rounded-xl overflow-hidden shadow-lg bg-base-200">
+    <div class="bg-base-200 p-4 border-b border-base-300">
         <div class="flex justify-between items-center">
             <div class="text-xl font-medium">Chat on: <%= data.plantName %></div>
             <div class="flex items-center">
-                <div class="flex items-center border-2 border-gray-700 border-opacity-100 rounded-full px-3 py-1">
+                <div class="flex items-center border-2 border-base-content rounded-full px-3 py-1">
                     <span id="chatStatusDot" class="w-2 h-2 bg-red-500 rounded-full mr-2"></span>
                     <span id="chatStatusText" class="text-base">Offline</span>
                 </div>
@@ -65,14 +64,16 @@
     </div>
 
     <!-- Chat Messages -->
-    <div class="flex-1 overflow-y-auto p-4 space-y-4" id="chatMessages">
+    <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-base-100" id="chatMessages">
         <!-- Messages will be rendered here -->
     </div>
 
     <!-- Chat Input -->
-    <div class="mt-auto border-t bg-white">
+    <div class="mt-auto border-t border-base-300 bg-base-200">
         <form id="chatForm">
             <%- include('./chatInputComponent.ejs') %>
         </form>
     </div>
 </div>
+</body>
+</html>
