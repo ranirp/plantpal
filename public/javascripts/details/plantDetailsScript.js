@@ -366,18 +366,22 @@ async function loadOfflinePlantData(plantId) {
         if (offlinePlant) {
             console.log('Loaded offline plant:', offlinePlant);
             
-            // Update the page title
-            if (offlinePlant.plantName) {
-                document.title = `${offlinePlant.plantName} - Plant Details`;
-                
-                // Update any plant name elements on the page
+                // Format and update the plant name
+                if (offlinePlant.plantName) {
+                    const formattedName = offlinePlant.plantName.split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+                    document.title = `${formattedName} - Plant Details`;                
                 const plantNameElements = document.querySelectorAll('[data-plant-name]');
                 plantNameElements.forEach(el => {
-                    el.textContent = offlinePlant.plantName;
+                    const formattedName = offlinePlant.plantName.split(' ')
+                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+                        .join(' ');
+                    el.textContent = formattedName;
                 });
             }
             
-            // Update other plant details if elements exist
+            // Update plant details 
             if (offlinePlant.type) {
                 const typeElements = document.querySelectorAll('[data-plant-type]');
                 typeElements.forEach(el => {

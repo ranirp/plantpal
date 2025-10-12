@@ -29,11 +29,33 @@
 <html data-theme="cupcake">
     <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="description" content="PlantPal">
     <title>PlantPal</title>
         <link rel="stylesheet" href="/css/outputStyles.css" />
         <link rel="manifest" href="/manifest.json"/>
+        <style>
+            html {
+                height: -webkit-fill-available;
+            }
+            body {
+                min-height: 100vh;
+                min-height: -webkit-fill-available;
+                width: 100%;
+                overflow-x: hidden;
+            }
+            /* Fix for PWA installed app mode */
+            @media all and (display-mode: standalone) {
+                body {
+                    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
+                }
+                .flex.flex-col.h-screen {
+                    min-height: 100vh;
+                    min-height: -webkit-fill-available;
+                }
+            }
+        </style>
+        <script src="/javascripts/utils/notificationUtility.js" defer></script>
         <script defer>
             var loggedInUser = "<%= username %>";
             var plantId = "<%= Buffer.from(data._id.toString()).toString('base64') %>"; // Base64 encoded plant ID
@@ -73,7 +95,7 @@
         </script>
         <% } %>
     </head>
-    <body>
+    <body class="bg-base-100">
         <div class="flex flex-col h-screen w-full lg:flex-row gap-4 p-4">
             <!-- Plant Details Section -->
             <div class="lg:w-1/2 h-full bg-white rounded-lg shadow-lg border border-gray-200">
