@@ -65,7 +65,9 @@ function renderPlantList(plantList) {
     plantListContainer.innerHTML = '';
 
     // Add grid classes for 3-column layout
-    plantListContainer.className = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-2 py-4";
+    plantListContainer.className = plantList.length === 0 
+        ? "flex flex-col items-center justify-start min-h-[70vh] pt-20"
+        : "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-2 py-4";
 
     // Check if there are no plants to display
     if (plantList.length === 0) {
@@ -74,29 +76,26 @@ function renderPlantList(plantList) {
 
         // Add classes for styling 'no plants' message
         noMessagesDiv.classList.add(
-            "col-span-full",
             "flex",
             "flex-col",
             "items-center",
-            "justify-center",
-            "py-20"
         );
 
         // Create an image element for the 'no plants' message
         const noMessagesImage = document.createElement("img");
         noMessagesImage.src = "/images/noplant.jpg";
         noMessagesImage.alt = "No Plants";
-        noMessagesImage.classList.add("w-[400px]", "mb-8");
+        noMessagesImage.classList.add("w-40", "h-40", "object-contain", "mb-4");
 
         // Create a text element for the 'no plants' message
         const noMessagesText = document.createElement("div");
         noMessagesText.textContent = "No plants Found";
-        noMessagesText.classList.add("text-3xl", "font-semibold", "text-gray-500");
+        noMessagesText.classList.add("text-xl", "font-semibold", "text-gray-500", "text-center");
 
         // Create a subtitle
         const subtitle = document.createElement("div");
         subtitle.textContent = "Start sharing your plants with the community!";
-        subtitle.classList.add("text-lg", "text-gray-400", "mt-2");
+        subtitle.classList.add("text-base", "text-gray-400", "mt-2", "text-center");
 
         // Append the image and text to the message div
         noMessagesDiv.appendChild(noMessagesImage);
