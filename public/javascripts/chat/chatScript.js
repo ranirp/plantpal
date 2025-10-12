@@ -650,7 +650,7 @@ async function getChatHistory(plantID) {
         console.log("🌐 Online - fetching chat messages from server");
         
         // Fetch chat messages from the server
-        fetch(`/api/chat/${plantID}`)
+        fetch(`/api/chat/plants/${plantID}/messages`)
             .then(response => {
                 if (!response.ok) {
                     throw new Error(`HTTP error ${response.status}`);
