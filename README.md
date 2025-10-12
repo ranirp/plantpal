@@ -42,8 +42,8 @@ Before you begin, ensure you have the following installed:
 ### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/ranirp/plant-sharing-community.git
-cd plant-sharing-community
+git clone https://github.com/ranirp/plantpal.git
+cd plantpal
 ```
 
 Or download and extract the ZIP file from GitHub.
