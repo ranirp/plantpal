@@ -27,7 +27,8 @@ async function checkServerConnectivity(forceCheck = false) {
             isOnline: null,
             checkInterval: 60000, // 1 minute cache
             consecutiveFailures: 0,
-            consecutiveSuccesses: 0
+            consecutiveSuccesses: 0,
+            healthEndpoint: '/health' 
         };
     }
 

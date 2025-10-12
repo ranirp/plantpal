@@ -69,7 +69,7 @@ app.get('/health', (req, res) => {
     res.status(200).json({ 
         status: 'healthy',
         timestamp: new Date().toISOString(),
-        service: 'Plant Sharing Community',
+        service: 'PlantPal',
         version: "2.0"
     });
 });

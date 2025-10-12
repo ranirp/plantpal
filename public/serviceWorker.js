@@ -8,10 +8,10 @@
  * - API endpoints: Network-first with cache fallback
  * - Automatic cache cleanup on activation
  * 
- * @version 10
+ * @version 11
  */
 
-const CACHE_NAME = 'plantpal-cache-v10';
+const CACHE_NAME = 'plantpal-cache-v11';
 
 console.log("Service Worker: Registered");
 
