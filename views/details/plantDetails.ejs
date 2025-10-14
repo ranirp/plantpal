@@ -36,41 +36,7 @@
         <link rel="stylesheet" href="/css/outputStyles.css" />
         <link rel="manifest" href="/manifest.json"/>
         <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
-        <style>
-            html {
-                height: -webkit-fill-available;
-            }
-            body {
-                min-height: 100vh;
-                min-height: -webkit-fill-available;
-                width: 100%;
-                overflow-x: hidden;
-            }
-            /* Fix for PWA installed app mode */
-            @media all and (display-mode: standalone) {
-                body {
-                    padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
-                }
-                .flex.flex-col.h-screen {
-                    min-height: 100vh;
-                    min-height: -webkit-fill-available;
-                }
-            }
-            /* Back button styles */
-            .back-button {
-                position: absolute;
-                top: 16px;
-                left: 16px;
-                z-index: 10;
-                transition: all 0.2s ease;
-            }
-            .back-button:hover {
-                transform: translateX(-2px);
-            }
-            .back-button:active {
-                transform: scale(0.95);
-            }
-        </style>
+
         <script src="/javascripts/utils/notificationUtility.js" defer></script>
         <script defer>
             var loggedInUser = "<%= username %>";
@@ -124,13 +90,18 @@
         <div class="flex flex-col h-screen w-full lg:flex-row gap-4 p-4">
             <!-- Plant Details Section -->
             <div class="lg:w-1/2 h-full bg-white rounded-lg shadow-lg border border-gray-200 relative">
+                <!-- Back Button -->
                 <button 
                     onclick="goBack()" 
-                    class="back-button bg-white hover:bg-gray-100 text-gray-700 p-2 rounded-full shadow-md border border-gray-200"
+                    class="back-button p-2 rounded-full shadow-md"
                     aria-label="Go back"
                     title="Go back"
+                    style="position: absolute; top: 0.2rem; left: 0.2rem; z-index: 30; background-color: #22c55e; border: 1px solid #16a34a;"
                 >
-                    <i class="fas fa-arrow-left text-lg"></i>
+                    <!-- Chevron Left SVG -->
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2" stroke="white" class="w-6 h-6">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5" />
+                    </svg>
                 </button>
                 
                 <div class="h-full overflow-y-auto">

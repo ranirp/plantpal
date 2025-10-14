@@ -26,20 +26,24 @@
  * - Consistent spacing
  */
 %>
+<link rel="stylesheet" href="/css/outputStyles.css" />
 
 <div class="card w-full glass rounded-xl overflow-hidden">
     <%# Main container %>
     <div class="relative bg-base-100 px-4 pt-2 pb-2">
 
-        <%# Plant image %>
+        <%# Plant image with fixed aspect ratio container %>
         <div class="mx-auto w-full max-w-xl md:max-w-xl p-4">
             <figure class="relative overflow-hidden rounded-xl border border-base-300 bg-base-200 shadow-md hover:shadow-lg transition-shadow">
+                <div class="relative w-full aspect-[4/3] bg-base-300">
                     <img 
                         src="/images/uploads/<%= data.photo %>" 
                         alt="<%= data.plantName %>" 
-                        class="w-full min-h-64 sm:h-72 md:h-80 lg:h-96 object-cover object-center"
+                        class="absolute inset-0 w-full h-full object-contain"
                         onerror="this.onerror=null;this.src='/images/placeholder.jpg';" 
+                        loading="lazy"
                     />
+                </div>
             </figure>
         </div>
     </div>
@@ -51,8 +55,8 @@
             <div class="card-body p-4 space-y-4">
                 <%# Owner information %>
                 <div class="flex items-center gap-2">
-                    <div class="w-24 font-bold">Created by:</div>
-                    <div><%= data.nickname %></div>
+                    <div class="w-24 font-bold flex-shrink-0">Created by:</div>
+                    <div class="truncate"><%= data.nickname %></div>
                 </div>
 
                 <%# Plant type %>
@@ -63,8 +67,8 @@
 
                 <%# Creation date %>
                 <div class="flex items-center gap-2">
-                    <div class="w-24 font-bold">Added:</div>
-                    <div>
+                    <div class="w-24 font-bold flex-shrink-0">Added:</div>
+                    <div class="text-sm">
                         <%= new Date(data.createdAt).toLocaleDateString('en-US', {
                             year: 'numeric',
                             month: 'long',
@@ -81,10 +85,33 @@
         <div class="card bg-base-200 shadow-sm">
             <div class="card-body p-4">
                 <h3 class="font-bold mb-2">Description:</h3>
-                <div class="prose max-w-none">
+                <div class="prose max-w-none text-base-content">
                     <%= data.description %>
                 </div>
             </div>
         </div>
     </div>
 </div>
+
+<script>
+// Optional: Add loaded class when image finishes loading
+document.addEventListener('DOMContentLoaded', function() {
+    const images = document.querySelectorAll('img[loading="lazy"]');
+    
+    images.forEach(img => {
+        if (img.complete) {
+            img.classList.add('loaded');
+        } else {
+            img.addEventListener('load', function() {
+                this.classList.add('loaded');
+            });
+        }
+        
+        // Handle error state
+        img.addEventListener('error', function() {
+            this.classList.add('loaded');
+            console.warn('Failed to load image:', this.src);
+        });
+    });
+});
+</script>

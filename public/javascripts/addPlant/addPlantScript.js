@@ -34,9 +34,9 @@ function init() {
  * Makes nickname field read-only to prevent tampering.
  */
 function getLoggedInUser() {
-    // Try modern auth method first
-    if (typeof checkIfUserLoggedIn === 'function') {
-        checkIfUserLoggedIn().then((userName) => {
+    // Always try modern auth method first
+    checkIfUserLoggedIn()
+        .then((userName) => {
             if (userName && userName.value) {
                 loggedInUser = userName.value;
                 const nicknameField = document.getElementById("nickname");
@@ -46,22 +46,49 @@ function getLoggedInUser() {
                     nicknameField.style.backgroundColor = '#f3f4f6';
                     nicknameField.title = 'This is your logged-in username';
                 }
+            } else {
+                // Fallback to legacy auth method
+                getUserName()
+                    .then((legacyName) => {
+                        if (legacyName) {
+                            loggedInUser = legacyName.value || legacyName;
+                            const nicknameField = document.getElementById("nickname");
+                            if (nicknameField && loggedInUser) {
+                                nicknameField.value = loggedInUser;
+                                nicknameField.readOnly = true;
+                                nicknameField.style.backgroundColor = '#f3f4f6';
+                                nicknameField.title = 'This is your logged-in username';
+                            }
+                        } else {
+                            showNotification('Could not fetch your username. Please log in again.', 'error');
+                        }
+                    })
+                    .catch(() => {
+                        showNotification('Could not fetch your username. Please log in again.', 'error');
+                    });
             }
-        }).catch(() => { loggedInUser = null; });
-        return;
-    }
-    // Fallback to legacy auth method
-    if (typeof getUserName === 'function') {
-        getUserName().then((userName) => {
-            if (userName) {
-                loggedInUser = userName.value || userName;
-                const nicknameField = document.getElementById("nickname");
-                if (nicknameField && loggedInUser) {
-                    nicknameField.value = loggedInUser;
-                }
-            }
-        }).catch(() => { loggedInUser = null; });
-    }
+        })
+        .catch(() => {
+            // Fallback to legacy auth method
+            getUserName()
+                .then((legacyName) => {
+                    if (legacyName) {
+                        loggedInUser = legacyName.value || legacyName;
+                        const nicknameField = document.getElementById("nickname");
+                        if (nicknameField && loggedInUser) {
+                            nicknameField.value = loggedInUser;
+                            nicknameField.readOnly = true;
+                            nicknameField.style.backgroundColor = '#f3f4f6';
+                            nicknameField.title = 'This is your logged-in username';
+                        }
+                    } else {
+                        showNotification('Could not fetch your username. Please log in again.', 'error');
+                    }
+                })
+                .catch(() => {
+                    showNotification('Could not fetch your username. Please log in again.', 'error');
+                });
+        });
 }
 
 /**
@@ -306,7 +333,6 @@ function savePlantOffline(plantDetails, originalPhoto, resetFormState) {
  * @param {Function} resetFormState - Callback to reset form UI state
  */
 function submitPlantDetails(plantDetails, resetFormState) {
-    // Create FormData for multipart/form-data submission (required for file upload)
     const formData = new FormData();
     formData.append("plantName", plantDetails.plantName);
     formData.append("type", plantDetails.type);
@@ -315,6 +341,7 @@ function submitPlantDetails(plantDetails, resetFormState) {
     if (plantDetails.photo) {
         formData.append("photo", plantDetails.photo);
     }
+    
     fetch("/api/plants/addNewPlant", {
         method: "POST",
         body: formData
@@ -331,12 +358,18 @@ function submitPlantDetails(plantDetails, resetFormState) {
     .then(() => {
         resetFormState();
         showNotification("🌱 Plant shared successfully!", 'success', () => {
-            window.location.href = "/";
+            // Clear cache and redirect with timestamp to force refresh
+            if ('caches' in window) {
+                caches.delete('plant-cache').then(() => {
+                    window.location.href = "/?refresh=" + Date.now();
+                });
+            } else {
+                window.location.href = "/?refresh=" + Date.now();
+            }
         });
-    }, 500)
+    })
     .catch(error => {
         resetFormState();
-        // Clean up error message to avoid showing localhost URL
         const errorMessage = error.message.replace(/https?:\/\/[^\/]+/g, '');
         showNotification("❌ Error: Please check your input and try again.", 'error');
         console.error('Submission error:', errorMessage);

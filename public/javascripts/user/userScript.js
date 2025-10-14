@@ -10,7 +10,51 @@
  * - Login state verification
  */
 
-let loggedInUser;
+/**
+ * Callback executed when user successfully logs in.
+ * Updates UI to reflect logged-in state.
+ */
+function onUserLoggedIn() {
+    console.log('[User] User logged in:', loggedInUser);
+    
+    // Update UI elements for logged-in state
+    const loginModal = document.getElementById('loginModal');
+    const logoutButton = document.getElementById('logoutButton');
+    const loginButton = document.getElementById('loginButton');
+    
+    // Hide login modal if it exists
+    if (loginModal && loginModal.close) {
+        loginModal.close();
+    }
+    
+    // Show logout button, hide login button
+    if (logoutButton) logoutButton.style.display = 'block';
+    if (loginButton) loginButton.style.display = 'none';
+    
+    // Dispatch custom event for other parts of app to listen
+    window.dispatchEvent(new CustomEvent('userLoggedIn', { 
+        detail: { username: loggedInUser } 
+    }));
+}
+
+/**
+ * Callback executed when user logs out or is not found.
+ * Updates UI to reflect logged-out state.
+ */
+function onUserLoggedOut() {
+    console.log('[User] User logged out or not found');
+    
+    // Update UI elements for logged-out state
+    const logoutButton = document.getElementById('logoutButton');
+    const loginButton = document.getElementById('loginButton');
+    
+    // Show login button, hide logout button
+    if (logoutButton) logoutButton.style.display = 'none';
+    if (loginButton) loginButton.style.display = 'block';
+    
+    // Dispatch custom event for other parts of app to listen
+    window.dispatchEvent(new CustomEvent('userLoggedOut'));
+}
 
 /**
  * Log out current user and clear user data.

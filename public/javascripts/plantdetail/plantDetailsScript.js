@@ -16,12 +16,6 @@ const PLANT_DETAILS_DB_VERSION = 1;
 
 let plantDetailsDB = null;
 
-/**
- * Initialize IndexedDB for plant details and chart data.
- * Creates object stores for charts and plant details cache.
- * 
- * @returns {Promise<IDBDatabase>} Opened database instance
- */
 async function initPlantDetailsDB() {
     return new Promise((resolve, reject) => {
         const request = indexedDB.open(PLANT_DETAILS_DB_NAME, PLANT_DETAILS_DB_VERSION);
@@ -40,36 +34,23 @@ async function initPlantDetailsDB() {
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
             
-            // Create charts store if it doesn't exist
             if (!db.objectStoreNames.contains('charts')) {
-                const chartsStore = db.createObjectStore('charts', { 
-                    keyPath: 'plantId' 
-                });
+                const chartsStore = db.createObjectStore('charts', { keyPath: 'plantId' });
                 chartsStore.createIndex('plantId', 'plantId', { unique: true });
                 chartsStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
-                console.log('Charts object store created');
             }
             
-            // Create plant details cache store if it doesn't exist
             if (!db.objectStoreNames.contains('plantDetailsCache')) {
-                const detailsStore = db.createObjectStore('plantDetailsCache', { 
-                    keyPath: 'plantId' 
-                });
+                const detailsStore = db.createObjectStore('plantDetailsCache', { keyPath: 'plantId' });
                 detailsStore.createIndex('plantId', 'plantId', { unique: true });
                 detailsStore.createIndex('lastAccessed', 'lastAccessed', { unique: false });
-                console.log('Plant details cache object store created');
             }
         };
     });
 }
 
-/**
- * Save chart data to IndexedDB
- */
 async function saveChartToIDB(plantId, chartData) {
-    if (!plantDetailsDB) {
-        await initPlantDetailsDB();
-    }
+    if (!plantDetailsDB) await initPlantDetailsDB();
     
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['charts'], 'readwrite');
@@ -90,43 +71,27 @@ async function saveChartToIDB(plantId, chartData) {
         };
         
         request.onerror = () => {
-            console.error('Error saving chart data to IndexedDB:', request.error);
+            console.error('Error saving chart data:', request.error);
             reject(request.error);
         };
     });
 }
 
-/**
- * Get chart data from IndexedDB
- */
 async function getChartFromIDB(plantId) {
-    if (!plantDetailsDB) {
-        await initPlantDetailsDB();
-    }
+    if (!plantDetailsDB) await initPlantDetailsDB();
     
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['charts'], 'readonly');
         const store = transaction.objectStore('charts');
         const request = store.get(plantId);
         
-        request.onsuccess = () => {
-            resolve(request.result);
-        };
-        
-        request.onerror = () => {
-            console.error('Error getting chart data from IndexedDB:', request.error);
-            reject(request.error);
-        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
     });
 }
 
-/**
- * Cache plant details in IndexedDB
- */
 async function cachePlantDetails(plantId, plantData) {
-    if (!plantDetailsDB) {
-        await initPlantDetailsDB();
-    }
+    if (!plantDetailsDB) await initPlantDetailsDB();
     
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['plantDetailsCache'], 'readwrite');
@@ -139,88 +104,51 @@ async function cachePlantDetails(plantId, plantData) {
         };
         
         const request = store.put(detailsRecord);
-        
-        request.onsuccess = () => {
-            console.log('Plant details cached for plant:', plantId);
-            resolve(detailsRecord);
-        };
-        
-        request.onerror = () => {
-            console.error('Error caching plant details:', request.error);
-            reject(request.error);
-        };
+        request.onsuccess = () => resolve(detailsRecord);
+        request.onerror = () => reject(request.error);
     });
 }
 
-/**
- * Get cached plant details from IndexedDB
- */
 async function getCachedPlantDetails(plantId) {
-    if (!plantDetailsDB) {
-        await initPlantDetailsDB();
-    }
+    if (!plantDetailsDB) await initPlantDetailsDB();
     
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['plantDetailsCache'], 'readonly');
         const store = transaction.objectStore('plantDetailsCache');
         const request = store.get(plantId);
         
-        request.onsuccess = () => {
-            resolve(request.result);
-        };
-        
-        request.onerror = () => {
-            console.error('Error getting cached plant details:', request.error);
-            reject(request.error);
-        };
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
     });
 }
 
-/**
- * Sync chart data to MongoDB when online
- */
 async function syncChartToServer(plantId, chartData) {
     if (!navigator.onLine) {
-        console.log('Offline: Chart data will be synced when online');
+        console.log('Offline: Chart will sync when online');
         return false;
     }
     
     try {
         const response = await fetch(`/api/plants/${plantId}/chart`, {
             method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-            },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(chartData)
         });
         
         if (response.ok) {
-            console.log('Chart data synced to server for plant:', plantId);
-            
-            // Update the chart record to mark it as synced
-            await saveChartToIDB(plantId, {
-                ...chartData,
-                syncedToServer: true
-            });
-            
+            console.log('Chart synced to server:', plantId);
+            await saveChartToIDB(plantId, { ...chartData, syncedToServer: true });
             return true;
-        } else {
-            console.error('Failed to sync chart data to server:', response.statusText);
-            return false;
         }
+        return false;
     } catch (error) {
-        console.error('Error syncing chart data to server:', error);
+        console.error('Chart sync error:', error);
         return false;
     }
 }
 
-/**
- * Sync all unsynced charts when coming back online
- */
 async function syncAllChartsToServer() {
-    if (!navigator.onLine || !plantDetailsDB) {
-        return;
-    }
+    if (!navigator.onLine || !plantDetailsDB) return;
     
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['charts'], 'readonly');
@@ -228,10 +156,8 @@ async function syncAllChartsToServer() {
         const request = store.getAll();
         
         request.onsuccess = async () => {
-            const allCharts = request.result;
-            const unsyncedCharts = allCharts.filter(chart => !chart.syncedToServer);
-            
-            console.log(`Found ${unsyncedCharts.length} unsynced charts to upload`);
+            const unsyncedCharts = request.result.filter(chart => !chart.syncedToServer);
+            console.log(`Syncing ${unsyncedCharts.length} charts...`);
             
             const syncPromises = unsyncedCharts.map(chart => 
                 syncChartToServer(chart.plantId, chart.data)
@@ -239,92 +165,210 @@ async function syncAllChartsToServer() {
             
             try {
                 await Promise.all(syncPromises);
-                console.log('All charts synced to server');
+                console.log('All charts synced');
                 resolve();
             } catch (error) {
-                console.error('Error syncing charts to server:', error);
                 reject(error);
             }
         };
         
-        request.onerror = () => {
-            console.error('Error getting charts for sync:', request.error);
-            reject(request.error);
-        };
+        request.onerror = () => reject(request.error);
     });
 }
 
 /**
- * Load plant details - tries server first, falls back to IndexedDB if offline
+ * IMPROVED: Load plant details with better offline support
  */
 async function loadPlantDetails(plantId) {
-    // First try to get from server if online
-    if (navigator.onLine) {
+    console.log(`📦 Loading plant details for: ${plantId}`);
+    
+    // Check if online and try server first
+    const isOnline = typeof checkServerConnectivity === 'function'
+        ? await checkServerConnectivity()
+        : navigator.onLine;
+    
+    if (isOnline) {
         try {
             const response = await fetch(`/api/plants/${plantId}`);
             if (response.ok) {
                 const plantData = await response.json();
-                // Cache the plant details
                 await cachePlantDetails(plantId, plantData);
-                console.log('Plant details loaded from server:', plantId);
+                console.log('✅ Loaded from server:', plantId);
                 return plantData;
             }
         } catch (error) {
-            console.log('Server request failed, falling back to cache:', error);
+            console.log('⚠️ Server failed, trying cache:', error.message);
         }
     }
     
-    // If server fails or offline, try IndexedDB cache
+    // Try details cache
     const cachedDetails = await getCachedPlantDetails(plantId);
     if (cachedDetails) {
-        console.log('Plant details loaded from cache:', plantId);
+        console.log('📦 Loaded from cache:', plantId);
         return cachedDetails.data;
     }
     
-    // If not in cache, try to get from main plants database
+    // Try main plants database
     try {
         const plant = await getPlantFromMainDB(plantId);
         if (plant) {
-            console.log('Plant details loaded from main plants database:', plantId);
-            // Cache it for future use
+            console.log('📦 Loaded from main DB:', plantId);
             await cachePlantDetails(plantId, plant);
             return plant;
         }
     } catch (error) {
-        console.error('Error loading from main plants database:', error);
+        console.error('Error loading from main DB:', error);
     }
     
-    throw new Error('Plant details not found');
+    throw new Error(`Plant ${plantId} not found`);
 }
 
 /**
- * Get plant from main plants database (from addPlantUtility.js)
+ * IMPROVED: Get plant from main database with better error handling
  */
 async function getPlantFromMainDB(plantId) {
-    // Use the existing function from addPlantUtility.js if available
+    // Try using existing function first
     if (typeof getAllPlantsFromIDB === 'function') {
-        const allPlants = await getAllPlantsFromIDB();
-        return allPlants.find(plant => plant._id === plantId);
+        try {
+            const allPlants = await getAllPlantsFromIDB();
+            const plant = allPlants.find(p => p._id === plantId);
+            
+            if (plant) {
+                console.log('✅ Found in main DB:', plantId);
+                return plant;
+            }
+        } catch (error) {
+            console.error('Error getting from getAllPlantsFromIDB:', error);
+        }
     }
     
-    // Fallback implementation
-    if (!plantsDB) {
-        await initDB();
+    // Fallback: try direct IndexedDB access
+    if (typeof openSyncPlantIDB === 'function') {
+        try {
+            const db = await openSyncPlantIDB();
+            const transaction = db.transaction(['plants'], 'readonly');
+            const store = transaction.objectStore('plants');
+            const allPlants = await new Promise((resolve, reject) => {
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+            
+            // Find plant by ID
+            for (const item of allPlants) {
+                const plant = item.value || item;
+                if (plant._id === plantId) {
+                    console.log('✅ Found via direct DB access:', plantId);
+                    return plant;
+                }
+            }
+        } catch (error) {
+            console.error('Error in fallback DB access:', error);
+        }
     }
     
-    return new Promise((resolve, reject) => {
-        const transaction = plantsDB.transaction(['plants'], 'readonly');
-        const store = transaction.objectStore('plants');
-        const request = store.get(plantId);
+    return null;
+}
+
+/**
+ * IMPROVED: Load offline plant data with better UI updates
+ */
+async function loadOfflinePlantData(plantId) {
+    try {
+        console.log('📱 Loading offline plant:', plantId);
         
-        request.onsuccess = () => {
-            resolve(request.result);
-        };
+        const offlinePlant = await getPlantFromMainDB(plantId);
         
-        request.onerror = () => {
-            reject(request.error);
-        };
-    });
+        if (!offlinePlant) {
+            console.error('❌ Offline plant not found:', plantId);
+            showOfflinePlantError();
+            return;
+        }
+        
+        console.log('✅ Offline plant data:', offlinePlant);
+        
+        // Update UI with plant data
+        updatePlantUI(offlinePlant);
+        
+        // Show offline indicator
+        showOfflineIndicator();
+        
+    } catch (error) {
+        console.error('❌ Error loading offline plant:', error);
+        showOfflinePlantError();
+    }
+}
+
+/**
+ * Update page UI with plant data
+ */
+function updatePlantUI(plant) {
+    // Format plant name
+    if (plant.plantName) {
+        const formattedName = plant.plantName.split(' ')
+            .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+            .join(' ');
+        
+        document.title = `${formattedName} - Plant Details`;
+        
+        const nameElements = document.querySelectorAll('[data-plant-name]');
+        nameElements.forEach(el => el.textContent = formattedName);
+    }
+    
+    // Update other fields
+    if (plant.type) {
+        const typeElements = document.querySelectorAll('[data-plant-type]');
+        typeElements.forEach(el => el.textContent = plant.type);
+    }
+    
+    if (plant.description) {
+        const descElements = document.querySelectorAll('[data-plant-description]');
+        descElements.forEach(el => el.textContent = plant.description);
+    }
+    
+    if (plant.nickname) {
+        const nicknameElements = document.querySelectorAll('[data-plant-nickname]');
+        nicknameElements.forEach(el => el.textContent = plant.nickname);
+    }
+    
+    if (plant.createdAt || plant.dateAdded) {
+        const dateElements = document.querySelectorAll('[data-plant-date]');
+        const date = new Date(plant.createdAt || plant.dateAdded);
+        const formatted = date.toLocaleDateString();
+        dateElements.forEach(el => el.textContent = formatted);
+    }
+}
+
+/**
+ * Show offline plant indicator
+ */
+function showOfflineIndicator() {
+    const indicator = document.querySelector('.offline-plant-indicator');
+    if (indicator) {
+        indicator.style.display = 'block';
+        indicator.innerHTML = `
+            <div class="alert alert-info">
+                <i class="fas fa-wifi-slash"></i>
+                This plant was created offline and will sync when you're back online.
+            </div>
+        `;
+    }
+}
+
+/**
+ * Show error for offline plant not found
+ */
+function showOfflinePlantError() {
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'alert alert-error fixed top-4 left-1/2 transform -translate-x-1/2 z-50 max-w-md';
+    errorDiv.innerHTML = `
+        <i class="fas fa-exclamation-triangle"></i>
+        <span>This offline plant could not be loaded. It may have been corrupted or deleted.</span>
+    `;
+    document.body.insertBefore(errorDiv, document.body.firstChild);
+    
+    // Auto-remove after 5 seconds
+    setTimeout(() => errorDiv.remove(), 5000);
 }
 
 /**
@@ -334,93 +378,29 @@ async function initPlantDetailsSystem() {
     try {
         await initPlantDetailsDB();
         
-        // Check if this is an offline plant that needs to be loaded
+        // Check if this is an offline plant
         if (typeof plantID !== 'undefined' && plantID && plantID.startsWith('offline_')) {
-            console.log('Loading offline plant data for ID:', plantID);
+            console.log('📱 Detected offline plant:', plantID);
             await loadOfflinePlantData(plantID);
         }
         
-        // Set up online/offline event listeners
+        // Set up online/offline listeners
         window.addEventListener('online', async () => {
-            console.log('Back online! Syncing chart data...');
+            console.log('🌐 Back online! Syncing charts...');
             await syncAllChartsToServer();
         });
         
         window.addEventListener('offline', () => {
-            console.log('Gone offline. Chart data will be stored locally.');
+            console.log('📴 Offline mode - charts will sync later');
         });
         
-        console.log('Plant details system initialized');
+        console.log('✅ Plant details system initialized');
     } catch (error) {
-        console.error('Error initializing plant details system:', error);
+        console.error('❌ Init error:', error);
     }
 }
 
-/**
- * Load offline plant data and update the page
- */
-async function loadOfflinePlantData(plantId) {
-    try {
-        const offlinePlant = await getPlantFromMainDB(plantId);
-        
-        if (offlinePlant) {
-            console.log('Loaded offline plant:', offlinePlant);
-            
-                // Format and update the plant name
-                if (offlinePlant.plantName) {
-                    const formattedName = offlinePlant.plantName.split(' ')
-                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                        .join(' ');
-                    document.title = `${formattedName} - Plant Details`;                
-                const plantNameElements = document.querySelectorAll('[data-plant-name]');
-                plantNameElements.forEach(el => {
-                    const formattedName = offlinePlant.plantName.split(' ')
-                        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-                        .join(' ');
-                    el.textContent = formattedName;
-                });
-            }
-            
-            // Update plant details 
-            if (offlinePlant.type) {
-                const typeElements = document.querySelectorAll('[data-plant-type]');
-                typeElements.forEach(el => {
-                    el.textContent = offlinePlant.type;
-                });
-            }
-            
-            if (offlinePlant.description) {
-                const descElements = document.querySelectorAll('[data-plant-description]');
-                descElements.forEach(el => {
-                    el.textContent = offlinePlant.description;
-                });
-            }
-            
-            if (offlinePlant.nickname) {
-                const nicknameElements = document.querySelectorAll('[data-plant-nickname]');
-                nicknameElements.forEach(el => {
-                    el.textContent = offlinePlant.nickname;
-                });
-            }
-            
-            // Show offline indicator
-            const offlineIndicator = document.querySelector('.offline-plant-indicator');
-            if (offlineIndicator) {
-                offlineIndicator.style.display = 'block';
-            }
-            
-        } else {
-            console.error('Offline plant not found in IndexedDB:', plantId);
-            // Show error message
-            const errorDiv = document.createElement('div');
-            errorDiv.className = 'alert alert-error';
-            errorDiv.textContent = 'This offline plant could not be loaded. It may have been corrupted or deleted.';
-            document.body.insertBefore(errorDiv, document.body.firstChild);
-        }
-    } catch (error) {
-        console.error('Error loading offline plant data:', error);
-    }
-}
-
-// Initialize when DOM is loaded
+// Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', initPlantDetailsSystem);
+
+console.log("✅ Fixed plant details script loaded");
