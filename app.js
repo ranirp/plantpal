@@ -58,14 +58,17 @@ app.use("/api/chat", chatRouter);
 /**
  * Health check endpoint for connectivity monitoring.
  * Supports both HEAD and GET methods for efficient network status verification.
+ * @route HEAD /health
  * @route GET /health
  * @returns {Object} 200 - Server health status with timestamp and version
  */
+// Handle HEAD requests for efficient connectivity checks
+app.head('/health', (req, res) => {
+    res.status(200).end();
+});
+
+// Handle GET requests for detailed health information
 app.get('/health', (req, res) => {
-    if (req.method === 'HEAD') {
-        return res.status(200).end();
-    }
-    
     res.status(200).json({ 
         status: 'healthy',
         timestamp: new Date().toISOString(),
