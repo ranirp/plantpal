@@ -7,7 +7,7 @@
     "setup": "./setup.sh",
     "start": "node app.js",
     "dev": "nodemon app.js",
-    "tailwind": "npx tailwindcss -i ./public/css/inputStyles.css -o ./public/css/outputStyles.css --watch",
+    "tailwind": "npx tailwindcss -i ./public/css/inputStyles.css -o ./public/css/tailwind.css --watch",
     "build:css": "node build-css.js",
     "build:js": "node build-js.js",
     "build": "npm run build:css && npm run build:js"
