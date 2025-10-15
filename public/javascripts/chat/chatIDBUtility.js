@@ -11,6 +11,7 @@
  * - Last updated timestamp tracking
  */
 
+// IndexedDB database and store names for chat persistence.
 const CHAT_DB_NAME = "chatIDB";
 const CHAT_DB_VERSION = 3;
 const CHAT_MESSAGES_STORE = "chatMessages";
@@ -23,61 +24,65 @@ const CHAT_CACHE_STORE = "chatCache";
 function initChatDatabase() {
     return new Promise((resolve, reject) => {
         console.log("🔧 Initializing unified chat database...");
-        
+
+        // Open (or create) the IndexedDB database
         const request = indexedDB.open(CHAT_DB_NAME, CHAT_DB_VERSION);
-        
+
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
             console.log(`Upgrading database to version ${CHAT_DB_VERSION}`);
-            
+
             // Create chat messages store (for display)
             if (!db.objectStoreNames.contains(CHAT_MESSAGES_STORE)) {
-                const messagesStore = db.createObjectStore(CHAT_MESSAGES_STORE, { 
-                    keyPath: "localId", 
-                    autoIncrement: true 
+                const messagesStore = db.createObjectStore(CHAT_MESSAGES_STORE, {
+                    keyPath: "localId",
+                    autoIncrement: true
                 });
                 messagesStore.createIndex("plantID", "plantID", { unique: false });
                 messagesStore.createIndex("timestamp", "timestamp", { unique: false });
-                console.log("✅ Created chatMessages store");
+                console.log("Created chatMessages store");
             }
-            
+
             // Create pending sync store (for offline messages)
             if (!db.objectStoreNames.contains(PENDING_SYNC_STORE)) {
-                const syncStore = db.createObjectStore(PENDING_SYNC_STORE, { 
-                    keyPath: "localId", 
-                    autoIncrement: true 
+                const syncStore = db.createObjectStore(PENDING_SYNC_STORE, {
+                    keyPath: "localId",
+                    autoIncrement: true
                 });
                 syncStore.createIndex("plantID", "plantID", { unique: false });
                 syncStore.createIndex("timestamp", "timestamp", { unique: false });
-                console.log("✅ Created pendingMessages store");
+                console.log("Created pendingMessages store");
             }
-            
+
             // Create cache store (for offline viewing)
             if (!db.objectStoreNames.contains(CHAT_CACHE_STORE)) {
-                const cacheStore = db.createObjectStore(CHAT_CACHE_STORE, { 
-                    keyPath: "plantID" 
+                const cacheStore = db.createObjectStore(CHAT_CACHE_STORE, {
+                    keyPath: "plantID"
                 });
                 cacheStore.createIndex("lastUpdated", "lastUpdated", { unique: false });
-                console.log("✅ Created chatCache store");
+                console.log("Created chatCache store");
             }
         };
-        
+
         request.onsuccess = (event) => {
-            console.log("✅ Chat database initialized successfully");
+            console.log("Chat database initialized successfully");
             resolve(event.target.result);
         };
-        
+
         request.onerror = (event) => {
-            console.error("❌ Error initializing chat database:", event.target.error);
+            console.error("Error initializing chat database:", event.target.error);
             reject(event.target.error);
         };
     });
 }
 
-/**
- * Singleton database connection
- */
+// Singleton database connection
 let dbPromise = null;
+
+/**
+ * Get the chat IndexedDB database instance (singleton).
+ * @returns {Promise<IDBDatabase>}
+ */
 function getChatDatabase() {
     if (!dbPromise) {
         dbPromise = initChatDatabase();
@@ -91,32 +96,32 @@ function getChatDatabase() {
 async function addMessageToPendingSync(message) {
     try {
         const db = await getChatDatabase();
-        
-        // Add metadata
+
+        // Add metadata for offline sync
         if (!message.timestamp) {
             message.timestamp = Date.now();
         }
         message.syncStatus = 'pending';
         message.offlineCreated = true;
-        
+
         return new Promise((resolve, reject) => {
             const tx = db.transaction([PENDING_SYNC_STORE], "readwrite");
             const store = tx.objectStore(PENDING_SYNC_STORE);
             const request = store.add(message);
-            
+
             request.onsuccess = () => {
                 const localId = request.result;
-                console.log(`📦 Added message to pending sync queue, localId: ${localId}`);
+                console.log(`Added message to pending sync queue, localId: ${localId}`);
                 resolve(localId);
             };
-            
+
             request.onerror = () => {
-                console.error("❌ Error adding message to pending sync:", request.error);
+                console.error("Error adding message to pending sync:", request.error);
                 reject(request.error);
             };
         });
     } catch (error) {
-        console.error("❌ Error in addMessageToPendingSync:", error);
+        console.error("Error in addMessageToPendingSync:", error);
         throw error;
     }
 }
@@ -135,17 +140,17 @@ async function getAllPendingMessages() {
             
             request.onsuccess = () => {
                 const messages = request.result || [];
-                console.log(`📤 Found ${messages.length} pending messages to sync`);
+                console.log(`Found ${messages.length} pending messages to sync`);
                 resolve(messages);
             };
             
             request.onerror = () => {
-                console.error("❌ Error getting pending messages:", request.error);
+                console.error("Error getting pending messages:", request.error);
                 reject(request.error);
             };
         });
     } catch (error) {
-        console.error("❌ Error in getAllPendingMessages:", error);
+        console.error("Error in getAllPendingMessages:", error);
         return [];
     }
 }
@@ -163,17 +168,17 @@ async function deletePendingMessage(localId) {
             const request = store.delete(localId);
             
             request.onsuccess = () => {
-                console.log(`✅ Deleted pending message ${localId}`);
+                console.log(`Deleted pending message ${localId}`);
                 resolve();
             };
             
             request.onerror = () => {
-                console.error("❌ Error deleting pending message:", request.error);
+                console.error("Error deleting pending message:", request.error);
                 reject(request.error);
             };
         });
     } catch (error) {
-        console.error("❌ Error in deletePendingMessage:", error);
+        console.error("Error in deletePendingMessage:", error);
         throw error;
     }
 }
@@ -183,37 +188,38 @@ async function deletePendingMessage(localId) {
  */
 async function cacheChatMessages(plantID, messages) {
     if (!plantID || !Array.isArray(messages)) {
-        console.error("❌ Invalid parameters for cacheChatMessages");
+        console.error("Invalid parameters for cacheChatMessages");
         return Promise.reject(new Error("Invalid parameters"));
     }
-    
+
     try {
         const db = await getChatDatabase();
-        
+
         return new Promise((resolve, reject) => {
             const tx = db.transaction([CHAT_CACHE_STORE], "readwrite");
             const store = tx.objectStore(CHAT_CACHE_STORE);
-            
+
+            // Store chat messages with last updated timestamp
             const cacheEntry = {
                 plantID: plantID,
                 messages: messages,
                 lastUpdated: Date.now()
             };
-            
+
             const request = store.put(cacheEntry);
-            
+
             request.onsuccess = () => {
-                console.log(`✅ Cached ${messages.length} messages for plant ${plantID}`);
+                console.log(`Cached ${messages.length} messages for plant ${plantID}`);
                 resolve();
             };
-            
+
             request.onerror = () => {
-                console.error("❌ Error caching messages:", request.error);
+                console.error("Error caching messages:", request.error);
                 reject(request.error);
             };
         });
     } catch (error) {
-        console.error("❌ Error in cacheChatMessages:", error);
+        console.error("Error in cacheChatMessages:", error);
         throw error;
     }
 }
@@ -223,7 +229,7 @@ async function cacheChatMessages(plantID, messages) {
  */
 async function getCachedChatMessages(plantID) {
     if (!plantID) {
-        console.error("❌ Plant ID required");
+        console.error("Plant ID required");
         return [];
     }
     
@@ -238,27 +244,27 @@ async function getCachedChatMessages(plantID) {
             request.onsuccess = () => {
                 const cachedData = request.result;
                 if (cachedData && Array.isArray(cachedData.messages)) {
-                    console.log(`📦 Retrieved ${cachedData.messages.length} cached messages for plant ${plantID}`);
+                    console.log(`Retrieved ${cachedData.messages.length} cached messages for plant ${plantID}`);
                     resolve(cachedData.messages);
                 } else {
-                    console.log(`ℹ️ No cached messages for plant ${plantID}`);
+                    console.log(`No cached messages for plant ${plantID}`);
                     resolve([]);
                 }
             };
             
             request.onerror = () => {
-                console.error("❌ Error retrieving cached messages:", request.error);
+                console.error("Error retrieving cached messages:", request.error);
                 reject(request.error);
             };
         });
     } catch (error) {
-        console.error("❌ Error in getCachedChatMessages:", error);
+        console.error("Error in getCachedChatMessages:", error);
         return [];
     }
 }
 
 /**
- * Clear all pending messages (use with caution)
+ * Clear all pending messages 
  */
 async function clearAllPendingMessages() {
     try {
@@ -284,6 +290,7 @@ async function clearAllPendingMessages() {
         throw error;
     }
 }
+
 
 // Expose functions globally for use in other scripts
 window.ChatDB = {

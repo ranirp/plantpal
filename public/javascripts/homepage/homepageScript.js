@@ -12,49 +12,57 @@
  * - Real-time connectivity monitoring
  */
 
+// List of all plants currently loaded in memory
 let plantLists = [];
+
+// Current filter for plant type.
 let currentFilter = 'all';
+
+// Current sort type for plant list.
 let currentSort = 'date';
+
+// Prevents double initialization of homepage.
 let isInitialized = false;
 
 async function init() {
     if (isInitialized) {
-        console.log("⚠️ Init already running");
+        console.log("Init already running");
         return;
     }
     isInitialized = true;
-    
+
     console.log("HOMEPAGE INIT STARTED");
-    
+
     checkIfUserLoggedIn();
-    
-    // CRITICAL: Check if we just added a new plant
+
+    // Check if we just added a new plant
     checkForNewlyAddedPlant();
-    
+
     // STEP 1: Load from IndexedDB FIRST (instant display)
-    console.log("📦 Step 1: Loading cached plants for instant display...");
+    console.log("Step 1: Loading cached plants for instant display...");
     await getPlantsFromIDB();
-    
+
     // STEP 2: Setup sync listener
     listenForOnlineSync();
-    
+
     // STEP 3: Check if online and sync
-    const isActuallyOnline = typeof checkServerConnectivity === 'function' 
-        ? await checkServerConnectivity() 
+    const isActuallyOnline = typeof checkServerConnectivity === 'function'
+        ? await checkServerConnectivity()
         : navigator.onLine;
-    
-    console.log(`🔍 Connectivity: ${isActuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
-    
+
+    console.log(`Connectivity: ${isActuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
+
     if (isActuallyOnline) {
-        console.log("🌐 Step 2: Online - syncing and refreshing...");
+        // Sync and refresh if online
+        console.log("Step 2: Online - syncing and refreshing...");
         await checkIfThereIsSyncPlantAndUpdate();
         await getPlantsFromServer();
     } else {
-        console.log("📴 Step 2: Offline - using cached data");
+        console.log("Step 2: Offline - using cached data");
     }
-    
+
     await updateQueueCounter();
-    
+
     console.log("Init complete");
 }
 
@@ -64,15 +72,15 @@ function checkForNewlyAddedPlant() {
         const newPlantData = sessionStorage.getItem('newPlantData');
         
         if (newPlantAdded === 'true' && newPlantData) {
-            console.log("🆕 New plant detected!");
+            console.log("New plant detected!");
             
             const plant = JSON.parse(newPlantData);
-            console.log("🌱 New plant data:", plant);
+            console.log("New plant data:", plant);
             
             // Show notification
             if (typeof showNotification === 'function') {
                 const status = plant.__isServerPlant ? 'added' : 'saved offline';
-                showNotification(`✅ ${plant.plantName} ${status} successfully!`, 'success');
+                showNotification(`${plant.plantName} ${status} successfully!`, 'success');
             }
             
             // Clear flags
@@ -85,54 +93,55 @@ function checkForNewlyAddedPlant() {
 }
 
 async function getPlantsFromIDB() {
-    console.log("📦 Loading from IndexedDB...");
+    console.log("Loading from IndexedDB...");
     
     try {
         let allPlants = await getAllPlantsFromIDB();
-        console.log(`📦 Found ${allPlants.length} total items`);
-        
+        console.log(`Found ${allPlants.length} total items`);
+
         if (allPlants.length === 0) {
             plantLists = [];
             applyFilterAndSort();
             return;
         }
-        
+
+        // Deduplicate plants by signature
         const plantMap = new Map();
-        
+
         allPlants.forEach(plant => {
             const signature = `${plant.plantName}|${plant.nickname}|${plant.type}`.toLowerCase();
             const isServer = plant.__isServerPlant === true;
             const isPending = plant.__syncStatus === 'pending';
-            
+
             if (!plantMap.has(signature)) {
                 plantMap.set(signature, plant);
             } else {
                 const existing = plantMap.get(signature);
                 const existingIsServer = existing.__isServerPlant === true;
-                
+
                 // Replace if this one is better
                 if (isServer && !existingIsServer) {
-                    console.log(`🔄 Replacing with server version: ${plant.plantName}`);
+                    console.log(`Replacing with server version: ${plant.plantName}`);
                     plantMap.set(signature, plant);
                 } else if (isPending && !existingIsServer) {
                     plantMap.set(signature, plant);
                 }
             }
         });
-        
+
         plantLists = Array.from(plantMap.values());
-        
-        console.log(`✅ Loaded ${plantLists.length} plants (after dedup)`);
-        console.log("📊 Breakdown:", {
+
+        console.log(`Loaded ${plantLists.length} plants (after dedup)`);
+        console.log("Breakdown:", {
             server: plantLists.filter(p => p.__isServerPlant).length,
             pending: plantLists.filter(p => p.__syncStatus === 'pending').length,
             offline: plantLists.filter(p => p._id?.startsWith('offline_')).length
         });
-        
+
         applyFilterAndSort();
-        
+
     } catch (error) {
-        console.error("❌ Error loading from IndexedDB:", error);
+        console.error("Error loading from IndexedDB:", error);
         plantLists = [];
         applyFilterAndSort();
     }
@@ -140,44 +149,44 @@ async function getPlantsFromIDB() {
 
 async function getPlantsFromServer() {
     try {
-        console.log("🌐 Fetching from server...");
-        
+        console.log("Fetching from server...");
+
+        // Use cache buster to avoid stale data
         const cacheBuster = Date.now();
         const response = await fetch(`/api/plants/getAllPlants?sortBy=createdAt&order=desc&_=${cacheBuster}`, {
             cache: 'no-store'
         });
-        
+
         if (!response.ok) {
             throw new Error(`Server returned ${response.status}`);
         }
-        
+
         const data = await response.json();
         const serverPlants = data.plants || data;
-        
-        console.log(`✅ Received ${serverPlants.length} plants from server`);
-        
+
+        console.log(`Received ${serverPlants.length} plants from server`);
+
         // Update UI immediately
         plantLists = serverPlants;
         applyFilterAndSort();
-        
+
         // Background: cache to IndexedDB
         await addAllPlantsToIDB(serverPlants);
-        
+
     } catch (error) {
-        console.error("❌ Failed to fetch from server:", error.message);
-        console.log("📦 Using cached data");
-        // Keep showing cached data (already loaded in init)
+        console.error("Failed to fetch from server:", error.message);
+        console.log("Using cached data");
     }
 }
 
 async function checkIfThereIsSyncPlantAndUpdate() {
-    console.log("🔄 Checking for plants to sync...");
+    console.log("Checking for plants to sync...");
     
     try {
         const db = await openSyncPlantIDB();
         const syncEntries = await getAllSyncPlants(db);
         
-        console.log(`📦 Found ${syncEntries.length} items in queue`);
+        console.log(`Found ${syncEntries.length} items in queue`);
         
         let syncedCount = 0;
         
@@ -190,7 +199,7 @@ async function checkIfThereIsSyncPlantAndUpdate() {
                             && !plant.__isServerPlant;
             
             if (needsSync && navigator.onLine) {
-                console.log(`📤 Syncing: ${plant.plantName}`);
+                console.log(`Syncing: ${plant.plantName}`);
                 
                 try {
                     await addPlantToMongoDB(plant, localId);
@@ -204,7 +213,7 @@ async function checkIfThereIsSyncPlantAndUpdate() {
                     });
                     
                 } catch (error) {
-                    console.error(`❌ Failed to sync ${plant.plantName}:`, error);
+                    console.error(`Failed to sync ${plant.plantName}:`, error);
                 }
             }
         }
@@ -229,7 +238,7 @@ async function checkIfThereIsSyncPlantAndUpdate() {
 }
 
 function addPlantToMongoDB(plantDetails, plantId = null) {
-    console.log("📤 Syncing to server:", plantDetails.plantName);
+    console.log("Syncing to server:", plantDetails.plantName);
 
     return new Promise(async (resolve, reject) => {
         const formData = new FormData();
@@ -256,7 +265,7 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
             const responseData = await response.json();
             const serverId = responseData.plant?._id || responseData._id;
             
-            console.log("✅ Synced successfully, serverId:", serverId);
+            console.log("Synced successfully, serverId:", serverId);
 
             if (plantId && serverId) {
                 try {
@@ -268,7 +277,7 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                     const deleteReq = store.delete(plantId);
                     
                     deleteReq.addEventListener('success', async () => {
-                        console.log('✅ Removed from offline queue:', plantId);
+                        console.log('Removed from offline queue:', plantId);
                         try {
                             await updateQueueCounter();
                         } catch (e) {
@@ -278,7 +287,7 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
                     });
                     
                     deleteReq.addEventListener('error', (ev) => {
-                        console.error('❌ Error deleting:', ev.target.error);
+                        console.error('Error deleting:', ev.target.error);
                         resolve();
                     });
                 } catch (error) {
@@ -297,7 +306,7 @@ function addPlantToMongoDB(plantDetails, plantId = null) {
 }
 
 async function addAllPlantsToIDB(plants) {
-    console.log(`📦 Caching ${plants.length} plants...`);
+    console.log(`Caching ${plants.length} plants...`);
     
     try {
         const db = await openSyncPlantIDB();
@@ -357,41 +366,42 @@ async function addAllPlantsToIDB(plants) {
             transaction.onerror = () => reject(transaction.error);
         });
         
-        console.log(`✅ Cached ${plants.length} plants`);
+        console.log(`Cached ${plants.length} plants`);
         
         await updateQueueCounter();
         
     } catch (error) {
-        console.error("❌ Error caching:", error);
+        console.error("Error caching:", error);
     }
 }
 
 function listenForOnlineSync() {
     let syncTimeout = null;
-    
+
     window.addEventListener("online", async () => {
-        console.log("🌐 ONLINE event");
-        
+        console.log("ONLINE event");
+
         if (syncTimeout) clearTimeout(syncTimeout);
-        
+
+        // Debounce sync to avoid rapid firing
         syncTimeout = setTimeout(async () => {
             const isActuallyOnline = typeof checkServerConnectivity === 'function'
                 ? await checkServerConnectivity()
                 : true;
-            
+
             if (isActuallyOnline) {
-                console.log("✅ Server reachable, syncing...");
+                console.log("Server reachable, syncing...");
                 await checkIfThereIsSyncPlantAndUpdate();
                 await getPlantsFromServer();
             }
-            
+
             syncTimeout = null;
         }, 1000);
     });
 }
 
 function applyFilterAndSort() {
-    console.log(`🎨 Rendering ${plantLists.length} plants`);
+    console.log(`Rendering ${plantLists.length} plants`);
     
     let filteredPlants = [...plantLists];
     
@@ -416,7 +426,7 @@ function applyFilterAndSort() {
         filteredPlants.sort((a, b) => (a.type || '').localeCompare(b.type || ''));
     }
     
-    console.log(`📊 Displaying ${filteredPlants.length} plants`);
+    console.log(`Displaying ${filteredPlants.length} plants`);
     renderPlantList(filteredPlants);
 }
 
@@ -470,7 +480,7 @@ function openAddPlantPage() {
 
 // Export for compatibility
 window.refreshHomepagePlants = async function() {
-    console.log("🔄 Manual refresh");
+    console.log("Manual refresh");
     await getPlantsFromIDB();
 };
 
@@ -490,5 +500,3 @@ document.addEventListener('DOMContentLoaded', () => {
         sortTypeBtn.addEventListener('click', () => sortList('type'));
     }
 });
-
-console.log("✅ Fixed homepage script loaded");

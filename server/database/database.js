@@ -13,22 +13,34 @@ require("dotenv").config();
 const URI = process.env.MONGO_DB;
 
 /**
- * Initialize MongoDB connection with optimized timeout settings.
- * Uses shorter timeouts (5s server selection, 45s socket timeout) for faster failure detection.
+ * Validate connection string before attempting to connect.
+ * If the environment variable is missing, provide a clear error and avoid calling mongoose.connect with undefined.
  */
-mongoose
-    .connect(URI, {
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-    })
-    .then(() => {
-        console.log("✅ Successfully connected to MongoDB");
-    })
-    .catch((err) => {
-        console.error("❌ Error connecting to MongoDB:", err.message);
-        console.error("Please check that MongoDB is running and connection string is correct");
-        global.isMongoDBAvailable = false;
-    });
+if (!URI || typeof URI !== 'string' || URI.trim() === '') {
+    console.error('❌ Missing MONGO_DB environment variable.');
+    console.error('Please copy .env.example to .env and set MONGO_DB to your MongoDB connection string.');
+    console.error('Example: MONGO_DB=mongodb://localhost:27017/plantpal');
+    // Set global flag so rest of the app can gracefully degrade when DB is unavailable
+    global.isMongoDBAvailable = false;
+} else {
+    /**
+     * Initialize MongoDB connection with optimized timeout settings.
+     * Uses shorter timeouts (5s server selection, 45s socket timeout) for faster failure detection.
+     */
+    mongoose
+        .connect(URI, {
+            serverSelectionTimeoutMS: 5000,
+            socketTimeoutMS: 45000,
+        })
+        .then(() => {
+            console.log("✅ Successfully connected to MongoDB");
+        })
+        .catch((err) => {
+            console.error("❌ Error connecting to MongoDB:", err.message);
+            console.error("Please check that MongoDB is running and connection string is correct");
+            global.isMongoDBAvailable = false;
+        });
+}
 
 /**
  * Monitor Mongoose connection events and update global availability status.

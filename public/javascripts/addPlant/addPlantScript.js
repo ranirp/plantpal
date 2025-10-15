@@ -12,9 +12,16 @@
  * - Background sync for offline submissions
  */
 
+// Stores the currently logged-in user's nickname
 let loggedInUser = null;
+
+// Web Worker instance for image processing
 let imageWorker = null;
+
+// Holds the compressed image blob for upload
 let compressedImageBlob = null;
+
+// Prevents duplicate form submissions
 let isSubmitting = false;
 
 /**
@@ -34,7 +41,7 @@ function init() {
  * Makes nickname field read-only to prevent tampering.
  */
 function getLoggedInUser() {
-    // Always try modern auth method first
+    // Try modern auth method
     checkIfUserLoggedIn()
         .then((userName) => {
             if (userName && userName.value) {
@@ -103,6 +110,7 @@ function initializeWebWorker() {
                 const { type } = e.data || {};
                 switch (type) {
                     case 'COMPRESS_SUCCESS':
+                        // Store compressed image for upload
                         compressedImageBlob = e.data.blob || null;
                         break;
                     case 'VALIDATION_ERROR':
@@ -141,6 +149,7 @@ function setupImagePreviewWithWorker() {
             const previewImg = document.getElementById("previewImg");
             if (file && imageWorker) {
                 try {
+                    // Validate image before upload
                     imageWorker.postMessage({ type: 'VALIDATE_IMAGE', data: { name: file.name, size: file.size, type: file.type } });
                 } catch (err) {}
                 const reader = new FileReader();
@@ -152,6 +161,7 @@ function setupImagePreviewWithWorker() {
                 };
                 reader.readAsDataURL(file);
                 try {
+                    // Compress image before upload
                     imageWorker.postMessage({ type: 'COMPRESS_IMAGE', data: { file: file, maxWidth: 800, maxHeight: 600, quality: 0.8 } });
                 } catch (err) {}
             } else if (file) {
@@ -220,12 +230,15 @@ function addNewPlantDetails() {
         submitButton.disabled = true;
         submitButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>Submitting...';
     }
+
+    // IMPORTANT: Gather form values
     const plantName = document.getElementById("plantName") ? document.getElementById("plantName").value.trim() : '';
     const type = document.getElementById("type") ? document.getElementById("type").value : '';
     const description = document.getElementById("description") ? document.getElementById("description").value.trim() : '';
     const nickname = document.getElementById("nickname") ? document.getElementById("nickname").value.trim() : '';
     const photoInput = document.getElementById("photoID");
     const originalPhoto = photoInput && photoInput.files && photoInput.files[0] ? photoInput.files[0] : null;
+
     // Helper function to reset UI state after form submission (success or failure)
     const resetFormState = () => {
         isSubmitting = false;
@@ -234,6 +247,8 @@ function addNewPlantDetails() {
             submitButton.innerHTML = originalButtonText;
         }
     };
+
+    // Validate required fields
     const missing = [];
     if (!plantName) missing.push('Plant Name');
     if (!type) missing.push('Plant Type');
@@ -254,9 +269,10 @@ function addNewPlantDetails() {
         resetFormState();
         return;
     }
+
     // Use compressed image if available, otherwise use original
     const photoForUpload = compressedImageBlob || originalPhoto;
-    
+
     // Prepare plant data for submission
     const plantDetails = {
         plantName,
@@ -266,6 +282,7 @@ function addNewPlantDetails() {
         photo: photoForUpload,
         createdAt: new Date().toISOString()
     };
+
     // Check both browser online status and actual server connectivity
     if (navigator.onLine && typeof checkServerConnectivity === 'function') {
         checkServerConnectivity().then((isActuallyOnline) => {
@@ -333,6 +350,7 @@ function savePlantOffline(plantDetails, originalPhoto, resetFormState) {
  * @param {Function} resetFormState - Callback to reset form UI state
  */
 function submitPlantDetails(plantDetails, resetFormState) {
+    // Use FormData for file upload
     const formData = new FormData();
     formData.append("plantName", plantDetails.plantName);
     formData.append("type", plantDetails.type);
@@ -341,7 +359,7 @@ function submitPlantDetails(plantDetails, resetFormState) {
     if (plantDetails.photo) {
         formData.append("photo", plantDetails.photo);
     }
-    
+
     fetch("/api/plants/addNewPlant", {
         method: "POST",
         body: formData

@@ -5,9 +5,8 @@
  * 
  * Key Features:
  * - Lightweight HEAD requests to health endpoint
- * - 1-minute caching to reduce network overhead
- * - 3-second timeout for responsive checks
- * - Consecutive failure/success tracking
+ * - Timeout handling with AbortController
+ * - Consecutive failure/success tracking for stability
  * - Cache-busting headers for accurate status
  */
 
@@ -20,47 +19,38 @@
  * @returns {Promise<boolean>} True if server reachable, false otherwise
  */
 async function checkServerConnectivity(forceCheck = false) {
-    // Cache connectivity status (updated every minute)
     if (!window._connectivityState) {
         window._connectivityState = {
             lastCheck: 0,
             isOnline: null,
-            checkInterval: 60000, // 1 minute cache
+            checkInterval: 10000,
             consecutiveFailures: 0,
             consecutiveSuccesses: 0,
-            healthEndpoint: '/health' 
+            healthEndpoint: '/health'
         };
     }
 
-    // Use cached value if recent (unless forcing a check)
-    const now = Date.now();
-    if (!forceCheck && 
-        window._connectivityState.isOnline !== null && 
-        now - window._connectivityState.lastCheck < window._connectivityState.checkInterval) {
-        console.log(`🔵 Using cached connectivity (${window._connectivityState.isOnline ? 'online' : 'offline'}) from ${Math.round((now - window._connectivityState.lastCheck)/1000)}s ago`);
-        return window._connectivityState.isOnline;
+    const state = window._connectivityState;
+    const now = Date.now(); 
+    
+    // Use cached value if recent 
+    if (!forceCheck && state.isOnline !== null && 
+        (now - state.lastCheck) < state.checkInterval) {
+        const age = Math.round((now - state.lastCheck) / 1000);
+        console.log(`Using cached status: ${state.isOnline ? 'ONLINE' : 'OFFLINE'} (${age}s old)`);
+        return state.isOnline;
     }
 
-    // If navigator says we're offline and we're not forcing a check, no need to check server
-    if (!forceCheck && !navigator.onLine) {
-        console.log('🔴 Navigator.onLine is false - definitely offline');
-        window._connectivityState.isOnline = false;
-        window._connectivityState.lastCheck = now;
-        window._connectivityState.consecutiveFailures++;
-        window._connectivityState.consecutiveSuccesses = 0;
-        return false;
-    }
-
+    console.log("Checking server connectivity...");
+    
     try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout
+        const timeoutId = setTimeout(() => controller.abort(), 2000);
 
-        // Use health endpoint or API endpoint for checking
-        const checkEndpoint = '/health'; // Faster health endpoint
-        const response = await fetch(checkEndpoint, {
+        const response = await fetch('/health', {
             method: 'HEAD',
             signal: controller.signal,
-            cache: 'no-store', // Never use cache for connectivity checks
+            cache: 'no-store',
             headers: {
                 'Cache-Control': 'no-cache, no-store, must-revalidate',
                 'Pragma': 'no-cache',
@@ -70,61 +60,36 @@ async function checkServerConnectivity(forceCheck = false) {
 
         clearTimeout(timeoutId);
 
-        // Server responded - we're online
         if (response.ok || response.status === 304) {
-            console.log('🟢 Server connectivity check: ONLINE');
-            window._connectivityState.consecutiveSuccesses++;
-            window._connectivityState.consecutiveFailures = 0;
-            window._connectivityState.isOnline = true;
-            window._connectivityState.lastCheck = now;
+            console.log('Server ONLINE');
+            state.consecutiveSuccesses++;
+            state.consecutiveFailures = 0;
+            state.isOnline = true;
+            state.lastCheck = now;
             return true;
         } else {
-            console.log('🟡 Server responded with status:', response.status);
-        const isOnline = response.status < 500; 
+            console.log('Server responded:', response.status);
+            const isOnline = response.status < 500;
             
-        // Update consecutive success/failure counters
-        if (isOnline) {
-            window._connectivityState.consecutiveSuccesses++;
-            window._connectivityState.consecutiveFailures = 0;
-        } else {
-            window._connectivityState.consecutiveFailures++;
-            window._connectivityState.consecutiveSuccesses = 0;
-        }
+            if (isOnline) {
+                state.consecutiveSuccesses++;
+                state.consecutiveFailures = 0;
+            } else {
+                state.consecutiveFailures++;
+                state.consecutiveSuccesses = 0;
+            }
             
-            window._connectivityState.isOnline = isOnline;
-            window._connectivityState.lastCheck = now;
+            state.isOnline = isOnline;
+            state.lastCheck = now;
             return isOnline;
         }
     } catch (error) {
-        // Network error or timeout - we're offline
-        if (error.name === 'AbortError') {
-            console.log('🔴 Server connectivity check: TIMEOUT (offline)');
-        } else {
-            console.log('🔴 Server connectivity check: ERROR (offline)', error.message);
-        }
+        console.log('Server check failed:', error.message);
         
-        // Increment failure counter
-        window._connectivityState.consecutiveFailures++;
-        window._connectivityState.consecutiveSuccesses = 0;
-        
-        if (window._connectivityState.consecutiveFailures > 2) {
-            window._connectivityState.isOnline = false;
-        } else if (window._connectivityState.isOnline !== null) {
-            console.log('⚠️ Ignoring temporary connectivity issue, maintaining previous status');
-        } else {
-            window._connectivityState.isOnline = false;
-        }
-        
-        window._connectivityState.lastCheck = now;
-        return window._connectivityState.isOnline;
+        state.consecutiveFailures++;
+        state.consecutiveSuccesses = 0;
+        state.isOnline = false;
+        state.lastCheck = now; 
+        return false;
     }
-}
-
-/**
- * Update online status across the application
- * This can be called from any page to update the UI
- * @param {boolean} isOnline - Current connectivity status
- */
-function changeOnlineStatus(isOnline) {
-    console.log(`📡 Connectivity status: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
 }

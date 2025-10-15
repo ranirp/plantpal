@@ -43,81 +43,64 @@
 </div>
 
 <script>
-    let isOnlineStatus = false; // Start as offline until verified
+    let isOnlineStatus = null; // Unknown until checked
     
-    // Function to update UI based on connectivity status
     function updateOnlineStatus(isOnline) {
         const toast = document.getElementById('toast');
         
         if (isOnline) {
             toast.classList.add('hidden');
-            console.log('✅ Status: ONLINE - Connected to server');
+            console.log('✅ Status: ONLINE');
         } else {
             toast.classList.remove('hidden');
-            console.log('❌ Status: OFFLINE - Not connected to server');
+            console.log('❌ Status: OFFLINE');
         }
         isOnlineStatus = isOnline;
     }
     
-    // Initial check - verify actual connectivity on page load
+    // Initial check with retry
     (async () => {
-        console.log('═══════════════════════════════════════════');
-        console.log('🔍 CONNECTIVITY CHECK - Starting...');
-        console.log('📍 Navigator.onLine:', navigator.onLine);
+        console.log('Navigator.onLine:', navigator.onLine);
         
-        // Wait for connectivityCheck.js to be loaded
-        const waitForConnectivityCheck = async (maxAttempts = 10) => {
-            for (let i = 0; i < maxAttempts; i++) {
-                if (typeof checkServerConnectivity === 'function') {
-                    return true;
-                }
-                console.log(`⏳ Waiting for connectivity check script (attempt ${i+1}/${maxAttempts})...`);
-                await new Promise(resolve => setTimeout(resolve, 300));
-            }
-            return false;
-        };
+        // Wait for connectivity check script
+        let attempts = 0;
+        while (typeof checkServerConnectivity !== 'function' && attempts < 20) {
+            await new Promise(resolve => setTimeout(resolve, 200));
+            attempts++;
+        }
         
-        const isLoaded = await waitForConnectivityCheck();
-        if (!isLoaded) {
-            console.error('❌ ERROR: checkServerConnectivity function not found after multiple attempts!');
-            console.error('Make sure connectivityCheck.js is loaded before this component');
+        if (typeof checkServerConnectivity !== 'function') {
+            console.error('checkServerConnectivity not found!');
             updateOnlineStatus(navigator.onLine);
             return;
         }
         
-        const actuallyOnline = await checkServerConnectivity();
-        console.log('✅ CONNECTIVITY CHECK - Complete:', actuallyOnline ? 'ONLINE' : 'OFFLINE');
-        console.log('═══════════════════════════════════════════');
+        // Force a fresh check on page load
+        const actuallyOnline = await checkServerConnectivity(true); 
+        console.log('CONNECTIVITY CHECK - Complete:', actuallyOnline ? 'ONLINE' : 'OFFLINE');
         updateOnlineStatus(actuallyOnline);
     })();
 
+    // Handle online event
     window.addEventListener('online', async () => {
-        console.log('🌐 Navigator reports online - verifying server connectivity...');
-        // Add a small delay to let network stabilize
+        console.log('Browser reports online - verifying...');
         await new Promise(resolve => setTimeout(resolve, 500));
-        const actuallyOnline = await checkServerConnectivity();
+        const actuallyOnline = await checkServerConnectivity(true); 
         updateOnlineStatus(actuallyOnline);
-        if (actuallyOnline) {
-            console.log('✅ Confirmed: You are online and connected!');
-        } else {
-            console.log('⚠️  Navigator says online but server is unreachable');
-        }
     });
     
+    // Handle offline event
     window.addEventListener('offline', () => {
-        console.log('📡 Navigator reports offline');
+        console.log('Browser reports offline');
         updateOnlineStatus(false);
     });
-    
+
+    // Periodic check with forced verification
     setInterval(async () => {
-        const actuallyOnline = await checkServerConnectivity();
-        // Only update if status changed
+        const actuallyOnline = await checkServerConnectivity(true); // Always force!
         if (actuallyOnline !== isOnlineStatus) {
-            console.log(`🔄 Status changed: ${isOnlineStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
+            console.log('🔄 Status changed: ' + (isOnlineStatus ? 'ONLINE' : 'OFFLINE') + ' -> ' + (actuallyOnline ? 'ONLINE' : 'OFFLINE'));
             updateOnlineStatus(actuallyOnline);
-            
-            // Don't trigger additional sync on status change 
-            console.log("Status change detected by periodic check - UI updated but sync not triggered");
         }
-    }, 30000); 
+    }, 30000); // Check every 30 seconds
 </script>

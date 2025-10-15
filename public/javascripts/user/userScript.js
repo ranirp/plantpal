@@ -81,7 +81,7 @@ function logout() {
  */
 function clearAllPlantsFromIndexedDB() {
     return new Promise((resolve, reject) => {
-        // Check if the function exists (it should be loaded from addPlantUtility.js)
+        // Check if the function exists 
         if (typeof openSyncPlantIDB === 'function' && typeof deleteAllSyncPlantsFromIDB === 'function') {
             openSyncPlantIDB()
                 .then(db => deleteAllSyncPlantsFromIDB(db))

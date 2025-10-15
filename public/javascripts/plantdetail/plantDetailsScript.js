@@ -11,35 +11,42 @@
  * - Fallback to cached data when offline
  */
 
+// IndexedDB database name for plant details.
 const PLANT_DETAILS_DB_NAME = 'PlantDetailsDB';
+
+// IndexedDB version for plant details database.
 const PLANT_DETAILS_DB_VERSION = 1;
 
+// Singleton instance of the plant details IndexedDB database.
 let plantDetailsDB = null;
 
 async function initPlantDetailsDB() {
     return new Promise((resolve, reject) => {
+        // Open (or create) the IndexedDB database
         const request = indexedDB.open(PLANT_DETAILS_DB_NAME, PLANT_DETAILS_DB_VERSION);
-        
+
         request.onerror = () => {
             console.error('Error opening plant details database:', request.error);
             reject(request.error);
         };
-        
+
         request.onsuccess = () => {
             plantDetailsDB = request.result;
             console.log('Plant details database opened successfully');
             resolve(plantDetailsDB);
         };
-        
+
         request.onupgradeneeded = (event) => {
             const db = event.target.result;
-            
+
+            // Create charts store for chart data
             if (!db.objectStoreNames.contains('charts')) {
                 const chartsStore = db.createObjectStore('charts', { keyPath: 'plantId' });
                 chartsStore.createIndex('plantId', 'plantId', { unique: true });
                 chartsStore.createIndex('lastUpdated', 'lastUpdated', { unique: false });
             }
-            
+
+            // Create plant details cache store
             if (!db.objectStoreNames.contains('plantDetailsCache')) {
                 const detailsStore = db.createObjectStore('plantDetailsCache', { keyPath: 'plantId' });
                 detailsStore.createIndex('plantId', 'plantId', { unique: true });
@@ -51,25 +58,26 @@ async function initPlantDetailsDB() {
 
 async function saveChartToIDB(plantId, chartData) {
     if (!plantDetailsDB) await initPlantDetailsDB();
-    
+
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['charts'], 'readwrite');
         const store = transaction.objectStore('charts');
-        
+
+        // Store chart data with sync status
         const chartRecord = {
             plantId: plantId,
             data: chartData,
             lastUpdated: new Date().toISOString(),
             syncedToServer: navigator.onLine
         };
-        
+
         const request = store.put(chartRecord);
-        
+
         request.onsuccess = () => {
             console.log('Chart data saved to IndexedDB for plant:', plantId);
             resolve(chartRecord);
         };
-        
+
         request.onerror = () => {
             console.error('Error saving chart data:', request.error);
             reject(request.error);
@@ -92,17 +100,18 @@ async function getChartFromIDB(plantId) {
 
 async function cachePlantDetails(plantId, plantData) {
     if (!plantDetailsDB) await initPlantDetailsDB();
-    
+
     return new Promise((resolve, reject) => {
         const transaction = plantDetailsDB.transaction(['plantDetailsCache'], 'readwrite');
         const store = transaction.objectStore('plantDetailsCache');
-        
+
+        // Store plant details with last accessed timestamp
         const detailsRecord = {
             plantId: plantId,
             data: plantData,
             lastAccessed: new Date().toISOString()
         };
-        
+
         const request = store.put(detailsRecord);
         request.onsuccess = () => resolve(detailsRecord);
         request.onerror = () => reject(request.error);
@@ -124,17 +133,18 @@ async function getCachedPlantDetails(plantId) {
 
 async function syncChartToServer(plantId, chartData) {
     if (!navigator.onLine) {
+        // Defer sync if offline
         console.log('Offline: Chart will sync when online');
         return false;
     }
-    
+
     try {
         const response = await fetch(`/api/plants/${plantId}/chart`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(chartData)
         });
-        
+
         if (response.ok) {
             console.log('Chart synced to server:', plantId);
             await saveChartToIDB(plantId, { ...chartData, syncedToServer: true });
@@ -177,16 +187,16 @@ async function syncAllChartsToServer() {
 }
 
 /**
- * IMPROVED: Load plant details with better offline support
+ * Load plant details with better offline support
  */
 async function loadPlantDetails(plantId) {
-    console.log(`📦 Loading plant details for: ${plantId}`);
+    console.log(`Loading plant details for: ${plantId}`);
     
-    // Check if online and try server first
+    // Try server first if online, then fallback to cache
     const isOnline = typeof checkServerConnectivity === 'function'
         ? await checkServerConnectivity()
         : navigator.onLine;
-    
+
     if (isOnline) {
         try {
             const response = await fetch(`/api/plants/${plantId}`);
@@ -197,34 +207,34 @@ async function loadPlantDetails(plantId) {
                 return plantData;
             }
         } catch (error) {
-            console.log('⚠️ Server failed, trying cache:', error.message);
+            console.log('Server failed, trying cache:', error.message);
         }
     }
-    
+
     // Try details cache
     const cachedDetails = await getCachedPlantDetails(plantId);
     if (cachedDetails) {
-        console.log('📦 Loaded from cache:', plantId);
+        console.log('Loaded from cache:', plantId);
         return cachedDetails.data;
     }
-    
+
     // Try main plants database
     try {
         const plant = await getPlantFromMainDB(plantId);
         if (plant) {
-            console.log('📦 Loaded from main DB:', plantId);
+            console.log('Loaded from main DB:', plantId);
             await cachePlantDetails(plantId, plant);
             return plant;
         }
     } catch (error) {
         console.error('Error loading from main DB:', error);
     }
-    
+
     throw new Error(`Plant ${plantId} not found`);
 }
 
 /**
- * IMPROVED: Get plant from main database with better error handling
+ * Get plant from main database with better error handling
  */
 async function getPlantFromMainDB(plantId) {
     // Try using existing function first
@@ -271,11 +281,11 @@ async function getPlantFromMainDB(plantId) {
 }
 
 /**
- * IMPROVED: Load offline plant data with better UI updates
+ * Load offline plant data with better UI updates
  */
 async function loadOfflinePlantData(plantId) {
     try {
-        console.log('📱 Loading offline plant:', plantId);
+        console.log('Loading offline plant:', plantId);
         
         const offlinePlant = await getPlantFromMainDB(plantId);
         
@@ -380,27 +390,26 @@ async function initPlantDetailsSystem() {
         
         // Check if this is an offline plant
         if (typeof plantID !== 'undefined' && plantID && plantID.startsWith('offline_')) {
-            console.log('📱 Detected offline plant:', plantID);
+            console.log('Detected offline plant:', plantID);
             await loadOfflinePlantData(plantID);
         }
         
         // Set up online/offline listeners
         window.addEventListener('online', async () => {
-            console.log('🌐 Back online! Syncing charts...');
+            console.log('Back online! Syncing charts...');
             await syncAllChartsToServer();
         });
         
         window.addEventListener('offline', () => {
-            console.log('📴 Offline mode - charts will sync later');
+            console.log('Offline mode - charts will sync later');
         });
         
-        console.log('✅ Plant details system initialized');
+        console.log('Plant details system initialized');
     } catch (error) {
-        console.error('❌ Init error:', error);
+        console.error('Init error:', error);
     }
 }
 
 // Initialize when DOM is ready
 document.addEventListener('DOMContentLoaded', initPlantDetailsSystem);
 
-console.log("✅ Fixed plant details script loaded");
