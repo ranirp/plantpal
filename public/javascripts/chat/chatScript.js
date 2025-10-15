@@ -312,21 +312,9 @@ async function sendMessage() {
         }
 
     } else {
-        // OFFLINE: Check plant ownership before allowing offline chat
-        console.log("Offline mode - checking ownership...");
-
-        const canChatOffline = await isUserOwnPlant(plantId, loggedInUser);
-
-        if (!canChatOffline) {
-            // BLOCKED: User doesn't own plant
-            console.log("BLOCKED: User doesn't own this plant");
-            alert("Offline Mode Restriction\n\nYou can only send messages to plants that YOU added when offline.\n\nConnect to the internet to chat about all plants.");
-            return;
-        }
-
-        // ALLOWED: User owns plant, proceed with offline save
+        // Offline: Allow all users to send messages to any plant
         input.value = "";
-        console.log("User owns plant - saving message offline");
+        console.log("Saving message offline (no ownership restriction)");
 
         try {
             // Ensure ChatDB is available
@@ -682,8 +670,8 @@ async function loadCachedMessages(plantID, container) {
 function showNoMessagesUI(container) {
     container.innerHTML = `
         <div class="flex flex-col items-center justify-center h-full p-4">
-            <i class="fas fa-comments text-4xl text-gray-400 mb-4"></i>
-            <p class="text-gray-600 text-center">
+            <img src="/images/chat.jpg" alt="No messages" class="w-24 h-24 object-contain mb-4" style="background: inherit;" />
+            <p class="text-gray-600 text-center text-base">
                 No messages yet.<br>Start the conversation!
             </p>
         </div>
@@ -697,29 +685,29 @@ function renderChatMessage(messages) {
     const container = document.getElementById("chatMessages");
     if (!container) return;
     
+    // Remove empty state if present
+    const emptyState = container.querySelector('img[src="/images/chat.jpg"]');
+    if (emptyState && emptyState.parentElement && emptyState.parentElement.parentElement === container) {
+        emptyState.parentElement.remove();
+    }
+
     messages.forEach(msg => {
         // Check for duplicates
         const msgId = msg._id || msg.id || msg.localId || `${msg.userName}-${msg.timestamp || msg.chatTime}`;
-        
         if (renderedMessageIds.has(msgId)) {
             console.log(`Skipping duplicate message: ${msgId}`);
             return;
         }
-        
         // Normalize message properties
         normalizeMessageProperties(msg);
-        
         // Format timestamp
         formatMessageTime(msg);
-        
         // Create and append message div
         const messageDiv = createChatMessageDiv(msg);
         container.appendChild(messageDiv);
-        
         // Track rendered message
         renderedMessageIds.add(msgId);
     });
-    
     // Scroll to bottom
     container.scrollTop = container.scrollHeight;
 }
