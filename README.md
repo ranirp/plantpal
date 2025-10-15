@@ -56,7 +56,7 @@ This script will:
 - Check MongoDB availability
 - Provide next steps
 
-### Manual Setup
+## Manual Setup
 
 ### Step 1: Clone the Repository
 
@@ -237,7 +237,7 @@ You should see output like:
 🔄 Mongoose connection established
 ```
 
-### PWA Installation
+## PWA Installation
 
 The app can be installed as a Progressive Web App:
 1. Open the app in your browser
