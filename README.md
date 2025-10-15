@@ -264,11 +264,13 @@ The app can be installed as a Progressive Web App:
 
 ![App Plant Form](public/assets/AddPlantform.png)
 
-![Chat](public/assets/No-chat.png)
+![Chat](public/assets/No-Chat.png)
 
 ![Chat Online](public/assets/Chat-Online.png)
 
 ![Chat Offline](public/assets/Chat-Offline.png)
+
+----
 
 <h3 align="center"> ʘ‿ʘ </h3>
 
