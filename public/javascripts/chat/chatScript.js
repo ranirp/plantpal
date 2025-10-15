@@ -12,300 +12,849 @@
  * - Connectivity-aware UI updates
  */
 
+// Socket.IO instance for real-time communication
 let socket;
+// Number of attempts to initialize socket
 let socketInitAttempts = 0;
+// Timer for debouncing status updates
 let statusUpdateDebounceTimer = null;
+// Tracks if the connection is currently stable
 let connectionStable = false;
+// Timestamp of the last status update
 let lastStatusUpdate = null;
+// Array to hold chat messages
+let chatMessages = [];
+// Set to track rendered message IDs and prevent duplicates
+let renderedMessageIds = new Set();
 
 /**
- * Initialize chat system when DOM is ready.
- * Delays initialization to ensure all required scripts are loaded.
- * Creates socket connection and calls init function when ready.
+ * Initialize chat when DOM is ready
  */
-/**
- * Update chat header with formatted plant name
- */
-function updateChatHeader() {
-    const chatHeaderElement = document.querySelector('.text-xl.font-medium');
-    if (chatHeaderElement) {
-        const plantName = chatHeaderElement.textContent.replace('Chat on: ', '').trim();
-        chatHeaderElement.textContent = `Chat on: ${formatPlantName(plantName)}`;
-    }
-}
-
-document.addEventListener('DOMContentLoaded', function() {
-    console.log("Chat DOM loaded, waiting for scripts to initialize...");
-    
-    // Format plant name in chat header
-    updateChatHeader();
-    
-    // Delay initialization to ensure dependencies are loaded
+document.addEventListener('DOMContentLoaded', function () {
+    console.log("Chat DOM loaded, initializing...");
+    // Wait for dependencies to be available before initializing
     setTimeout(() => {
         initializeSocket();
-        // Call init function after socket is initialized
         if (typeof init === 'function') {
             init();
         } else {
             setTimeout(() => {
-                if (typeof init === 'function') {
-                    init();
-                } else {
-                    console.error("Chat init function not available after waiting");
-                }
+                if (typeof init === 'function') init();
             }, 1500);
         }
     }, 1000);
 });
 
 /**
- * Initialize Socket.IO connection with connectivity validation.
- * Implements retry logic and connection stability monitoring.
- * Debounces status updates to prevent UI flickering.
+ * Initialize Socket.IO connection with reconnection and connectivity checks
  */
 async function initializeSocket() {
-    // Ensure we're not initializing multiple times
     if (socket) {
-        console.log("Socket already initialized, skipping");
+        console.log("Socket already initialized");
         return;
     }
-    
+
     console.log("Initializing socket connection...");
-    
-    // Make sure connectivity check is available
+
+    // Wait for connectivity check function to be available
     if (typeof checkServerConnectivity !== 'function') {
         socketInitAttempts++;
         if (socketInitAttempts > 10) {
-            console.error("Failed to initialize socket: checkServerConnectivity function not available");
-            updateChatStatus(navigator.onLine); // Fall back to navigator.onLine
+            console.error("checkServerConnectivity not available");
+            updateChatStatus(navigator.onLine);
             return;
         }
-        console.log(`Waiting for connectivity check script (attempt ${socketInitAttempts}/10)...`);
         setTimeout(initializeSocket, 500);
         return;
     }
-    
-    // Check actual server connectivity before initializing socket
+
     try {
+        // Check if server is reachable before connecting
         const hasConnectivity = await checkServerConnectivity();
-        console.log(`Server connectivity check: ${hasConnectivity ? 'ONLINE' : 'OFFLINE'}`);
-        
-        // Initialize socket with improved connection options and path-relative URL
+        console.log(`Server connectivity: ${hasConnectivity ? 'ONLINE' : 'OFFLINE'}`);
+
+        // Initialize Socket.IO client with recommended options
         socket = io({
             autoConnect: true,
             reconnection: true,
-            reconnectionDelay: 2000,      
-            reconnectionDelayMax: 10000,  
-            reconnectionAttempts: 5,      
+            reconnectionDelay: 2000,
+            reconnectionDelayMax: 10000,
+            reconnectionAttempts: 5,
             timeout: 20000,
-            forceNew: true,
-            transports: ['websocket', 'polling'],
-            forceNew: false,
             transports: ['websocket', 'polling']
         });
-        
-        // Socket connection events with debounced status updates
-        socket.on('connect', async function() {
-            console.log('✅ Socket connected successfully');
-            
-            // Use a debounce mechanism to avoid frequent UI changes
+
+        // Handle successful connection
+        socket.on('connect', async function () {
+            console.log('✅ Socket connected');
             clearTimeout(statusUpdateDebounceTimer);
             statusUpdateDebounceTimer = setTimeout(async () => {
-                const actuallyOnline = await checkServerConnectivity();
-                if (connectionStable || Date.now() - (lastStatusUpdate || 0) > 5000) {
-                    updateChatStatus(actuallyOnline);
-                    
-                    // Rejoin room if we're actually online and have a plantId
-                    if (actuallyOnline && typeof plantId !== 'undefined' && plantId) {
-                        joinPlantChatRoom();
-                    }
-                    connectionStable = true;
-                    lastStatusUpdate = Date.now();
+                const online = await checkServerConnectivity();
+                updateChatStatus(online);
+                if (online && typeof plantId !== 'undefined' && plantId) {
+                    joinPlantChatRoom();
+                    // Sync any pending messages from offline
+                    await syncPendingMessages();
                 }
+                connectionStable = true;
+                lastStatusUpdate = Date.now();
             }, 1000);
         });
-        
-        socket.on('disconnect', function() {
-            console.log('❌ Socket disconnected');
-            
-            // Use a debounce mechanism to avoid frequent UI changes
+
+        // Handle disconnection
+        socket.on('disconnect', function () {
+            console.log('Socket disconnected');
             clearTimeout(statusUpdateDebounceTimer);
             statusUpdateDebounceTimer = setTimeout(() => {
-                if (connectionStable || Date.now() - (lastStatusUpdate || 0) > 5000) {
-                    updateChatStatus(false);
-                    connectionStable = false;
-                    lastStatusUpdate = Date.now();
-                }
-            }, 3000); 
+                updateChatStatus(false);
+                connectionStable = false;
+                lastStatusUpdate = Date.now();
+            }, 3000);
         });
-        
-        socket.on('connect_error', function(error) {
-            console.error('❌ Socket connection error:', error);
-        });
-        
-        socket.on('reconnect', function() {
-            console.log('🔄 Socket reconnected');
-            // Rejoin room after reconnection 
+
+        // Handle reconnection
+        socket.on('reconnect', async function () {
+            console.log('Socket reconnected');
             if (typeof plantId !== 'undefined' && plantId) {
                 joinPlantChatRoom();
+                await syncPendingMessages();
             }
         });
-        
-        console.log("Socket.io initialized successfully");
-        
+
+        console.log("Socket initialized");
+
     } catch (error) {
-        console.error("Error during socket initialization:", error);
+        console.error("Socket initialization error:", error);
         updateChatStatus(false);
     }
 }
 
 /**
- * Update chat UI status with debounce to prevent flickering
- * @param {boolean} isOnline - Whether the chat is currently online
+ * Sync all pending messages stored offline when back online
+ */
+async function syncPendingMessages() {
+    console.log("Checking for pending messages to sync...");
+
+    try {
+        if (typeof window.ChatDB === 'undefined') {
+            console.error("ChatDB not available for sync");
+            return;
+        }
+
+        // Retrieve all messages queued for sync
+        const pendingMessages = await window.ChatDB.getAllPendingMessages();
+
+        if (pendingMessages.length === 0) {
+            console.log("No pending messages to sync");
+            return;
+        }
+
+        console.log(`Syncing ${pendingMessages.length} pending messages...`);
+
+        for (const message of pendingMessages) {
+            try {
+                console.log(`Syncing message ${message.localId}:`, message);
+
+                // Save to server DB
+                await addChatToServerDB(message);
+
+                // Emit to socket if connected
+                if (socket && socket.connected) {
+                    socket.emit("chat", message);
+                }
+
+                // Remove from pending queue
+                await window.ChatDB.deletePendingMessage(message.localId);
+
+                console.log(`Synced and removed message ${message.localId}`);
+
+            } catch (error) {
+                console.error(`Failed to sync message ${message.localId}:`, error);
+            }
+        }
+
+        console.log("Finished syncing pending messages");
+
+        // Refresh chat to show synced messages
+        await getChatHistory(plantId);
+
+    } catch (error) {
+        console.error("Error in syncPendingMessages:", error);
+    }
+}
+
+/**
+ * Update chat status UI and notify other components
+ * @param {boolean} isOnline
  */
 async function updateChatStatus(isOnline) {
+    // Debounce status updates to avoid UI flicker
     if (lastStatusUpdate && Date.now() - lastStatusUpdate < 3000) {
-        console.log("🔄 Skipping rapid status update to prevent flickering");
         return;
     }
-    
+
+    // Double-check server connectivity if online
     if (isOnline && typeof checkServerConnectivity === 'function') {
         isOnline = await checkServerConnectivity();
     }
-    
+
     const statusDot = document.getElementById('chatStatusDot');
     const statusText = document.getElementById('chatStatusText');
-    
-    if (!statusDot || !statusText) {
-        console.error("Chat status elements not found in DOM");
-        return;
+
+    if (statusDot && statusText) {
+        if (isOnline) {
+            statusDot.className = 'w-2 h-2 bg-green-500 rounded-full mr-2';
+            statusText.textContent = 'Online';
+        } else {
+            statusDot.className = 'w-2 h-2 bg-red-500 rounded-full mr-2';
+            statusText.textContent = 'Offline';
+        }
     }
-    
-    if (isOnline) {
-        statusDot.className = 'w-2 h-2 bg-green-500 rounded-full mr-2';
-        statusText.textContent = 'Online';
-    } else {
-        statusDot.className = 'w-2 h-2 bg-red-500 rounded-full mr-2';
-        statusText.textContent = 'Offline';
-    }
-    
+
+    // Notify other UI elements of status change
     if (typeof changeOnlineStatus === 'function') {
         changeOnlineStatus(isOnline);
     }
-    
+
     lastStatusUpdate = Date.now();
-    console.log(`Chat status updated to: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
+    console.log(`Chat status: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
 }
 
-const urlParams = new URLSearchParams(window.location.search);
-var chatMessages = [];
+/**
+ * Initialize chat functionality
+ */
+window.init = function () {
+    console.log("Initializing chat functionality...");
 
-// Add a global function to refresh chat
-window.refreshChat = function() {
-    console.log("🔄 Chat refresh function called but is now deprecated");
-}
-
-// Make these functions globally accessible
-window.init = function() {
-    console.log("Initializing chat...");
-    
-    // Socket is initialized
     if (!socket) {
-        console.log("Socket not initialized yet, waiting...");
+        console.log("Waiting for socket...");
         setTimeout(init, 500);
         return;
     }
-    
-    // Check if plantId exists
+
+    // Extract plantId from URL if not set
     if (typeof plantId === 'undefined' || !plantId) {
-        console.error("plantId is not defined in init()");
         const pathParts = window.location.pathname.split('/');
         if (pathParts.length > 2) {
             plantId = pathParts[2];
-            console.log("Extracted plantId from URL:", plantId);
         }
     }
-    
-    // Check if loggedInUser exists
+
+    // Default to Guest if user not set
     if (typeof loggedInUser === 'undefined' || !loggedInUser) {
-        console.error("loggedInUser is not defined in init()");
         loggedInUser = "Guest";
     }
-    
-    console.log("Chat initialized with plantId:", plantId, "user:", loggedInUser);
-    
+
+    console.log(`Chat initialized: plantId=${plantId}, user=${loggedInUser}`);
+
     getChatHistory(plantId);
     registerSocket();
     registerFormSubmit();
     listenForOnlineSync();
-    
-    // Join room after socket is connected
+
     if (socket && socket.connected) {
         joinPlantChatRoom();
-    } else {
-        // Wait for socket to connect
-        socket.on('connect', function() {
-            joinPlantChatRoom();
+    }
+};
+
+/**
+ * Register form submit handler
+ */
+function registerFormSubmit() {
+    const chatForm = document.getElementById("chatForm");
+    if (chatForm) {
+        chatForm.addEventListener("submit", function(event) {
+            event.preventDefault();
+            sendMessage();
         });
     }
 }
 
+/**
+ * Send chat message (handles both online and offline scenarios)
+ */
+async function sendMessage() {
+    const input = document.getElementById("chatInput");
+    if (!input || input.value.trim() === "") {
+        return;
+    }
+
+    const messageText = input.value.trim();
+
+    // Construct message object with all required fields
+    const chatMessage = {
+        chatmessage: messageText,
+        chatMessage: messageText,
+        username: loggedInUser,
+        userName: loggedInUser,
+        plantId: plantId,
+        chattime: new Date().toISOString(),
+        chatTime: new Date().toISOString(),
+        timestamp: Date.now()
+    };
+
+    // Check connectivity before sending
+    const isOnline = navigator.onLine && await checkServerConnectivity();
+
+    if (isOnline) {
+        // ONLINE: Clear input and send message to server
+        input.value = "";
+        console.log("Sending message online:", messageText);
+
+        try {
+            await addChatToServerDB(chatMessage);
+            if (socket && socket.connected) {
+                socket.emit("chat", chatMessage);
+            }
+        } catch (error) {
+            console.error("Error sending message:", error);
+            alert("Failed to send message. Please try again.");
+        }
+
+    } else {
+        // OFFLINE: Check plant ownership before allowing offline chat
+        console.log("Offline mode - checking ownership...");
+
+        const canChatOffline = await isUserOwnPlant(plantId, loggedInUser);
+
+        if (!canChatOffline) {
+            // BLOCKED: User doesn't own plant
+            console.log("BLOCKED: User doesn't own this plant");
+            alert("Offline Mode Restriction\n\nYou can only send messages to plants that YOU added when offline.\n\nConnect to the internet to chat about all plants.");
+            return;
+        }
+
+        // ALLOWED: User owns plant, proceed with offline save
+        input.value = "";
+        console.log("User owns plant - saving message offline");
+
+        try {
+            // Ensure ChatDB is available
+            if (typeof window.ChatDB === 'undefined') {
+                throw new Error("ChatDB not available");
+            }
+
+            // Add to pending sync queue
+            const localId = await window.ChatDB.addMessageToPendingSync(chatMessage);
+            chatMessage.localId = localId;
+            chatMessage.syncStatus = 'pending';
+
+            console.log(`Message queued for sync with localId: ${localId}`);
+
+            // Update cache for offline display
+            try {
+                const cachedMessages = await window.ChatDB.getCachedChatMessages(plantId);
+                cachedMessages.push(chatMessage);
+                await window.ChatDB.cacheChatMessages(plantId, cachedMessages);
+            } catch (cacheError) {
+                console.warn("Cache update failed:", cacheError);
+            }
+
+            // Display message immediately in UI
+            renderChatMessage([chatMessage]);
+
+            // Show success notification
+            if (typeof showNotification === 'function') {
+                showNotification("Message saved. Will sync when online.", 'info');
+            }
+
+        } catch (error) {
+            console.error("Error saving offline message:", error);
+            alert("Failed to save message offline. Please try again.");
+            input.value = messageText;
+        }
+    }
+}
+
+/**
+ * Check if user owns the plant
+ */
+async function isUserOwnPlant(plantId, username) {
+    console.log(`Checking ownership: plantId=${plantId}, username=${username}`);
+    
+    try {
+        // Try server check first if online
+        if (navigator.onLine) {
+            try {
+                const response = await fetch(`/plantDetails/checkOwnership/${plantId}/${username}`, {
+                    method: 'GET',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                if (response.ok) {
+                    const data = await response.json();
+                    console.log(`Server ownership check: ${data.isOwner ? 'OWNED' : 'NOT OWNED'}`);
+                    return data.isOwner;
+                }
+            } catch (error) {
+                console.log('Server check failed, using offline method');
+            }
+        }
+        
+        // Offline check using IndexedDB
+        console.log('📱 Using offline IndexedDB ownership check');
+        
+        const db = await openSyncPlantIDB();
+        const plants = await getAllSyncPlants(db);
+        
+        console.log(`Found ${plants.length} plants in offline storage`);
+        
+        if (plants.length === 0) {
+            console.log('No plants in offline storage');
+            return false;
+        }
+        
+        // Check each plant for match
+        for (const p of plants) {
+            const plantData = p.value || p;
+            
+            // Extract IDs (handle different formats)
+            const storedPlantId = plantData._id || plantData.id;
+            const storedUsername = plantData.nickname || plantData.username || plantData.addedBy;
+            
+            console.log(`Checking plant: id=${storedPlantId}, owner=${storedUsername}`);
+            
+            // STRICT matching
+            const idMatch = (storedPlantId === plantId);
+            const userMatch = (storedUsername === username);
+            
+            if (idMatch && userMatch) {
+                console.log(`MATCH FOUND: User ${username} owns plant ${plantId}`);
+                return true;
+            }
+        }
+        
+        console.log(`NO MATCH: User ${username} does NOT own plant ${plantId}`);
+        return false;
+        
+    } catch (error) {
+        console.error("Error checking ownership:", error);
+        return false;
+    }
+}
+
+/**
+ * DEBUGGING HELPER: Add this to check what's in your IndexedDB
+ * Call this in browser console: debugPlantOwnership()
+ */
+
+window.debugPlantOwnership = async function() {
+    console.log("DEBUG: Checking plant ownership data...");
+    console.log(`Current plantId: ${plantId}`);
+    console.log(`Current user: ${loggedInUser}`);
+    
+    try {
+        const db = await openSyncPlantIDB();
+        const plants = await getAllSyncPlants(db);
+        
+        console.log(`Found ${plants.length} plants in IndexedDB:`);
+        
+        plants.forEach((p, index) => {
+            const plantData = p.value || p;
+            console.log(`\nPlant ${index + 1}:`, {
+                id: plantData._id || plantData.id,
+                name: plantData.name || plantData.plantname,
+                owner: plantData.nickname || plantData.username || plantData.addedBy,
+                fullData: plantData
+            });
+        });
+        
+        // Check current plant
+        const canChat = await isUserOwnPlant(plantId, loggedInUser);
+        console.log(`\n Can user ${loggedInUser} chat with plant ${plantId}? ${canChat ? 'YES' : 'NO'}`);
+        
+    } catch (error) {
+        console.error("Debug error:", error);
+    }
+};
+
+/**
+ * Plant IndexedDB helper functions
+ */
+async function openSyncPlantIDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open('plants', 1);
+        request.onerror = () => reject(request.error);
+        request.onupgradeneeded = (event) => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('plants')) {
+                db.createObjectStore('plants', { keyPath: 'id', autoIncrement: true });
+            }
+        };
+        request.onsuccess = () => resolve(request.result);
+    });
+}
+
+async function getAllSyncPlants(db) {
+    return new Promise((resolve, reject) => {
+        const tx = db.transaction(['plants'], 'readonly');
+        const store = tx.objectStore('plants');
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result || []);
+        request.onerror = () => reject(request.error);
+    });
+}
+
+/**
+ * Listen for online/offline events
+ */
 function listenForOnlineSync() {
-    // Check initial status with server connectivity
-    console.log("🔍 Checking initial connectivity for chat...");
     checkServerConnectivity().then(isOnline => {
-        console.log(`Chat connectivity check: ${isOnline ? 'ONLINE' : 'OFFLINE'}`);
         updateChatStatus(isOnline);
     });
-
-    window.addEventListener('online', async function () {
-        console.log("🌐 Navigator reports online, checking server connectivity...");
-        // Add a small delay to let network stabilize
+    
+    window.addEventListener('online', async function() {
+        console.log("Device reports online...");
         await new Promise(resolve => setTimeout(resolve, 1500));
-        const actuallyOnline = await checkServerConnectivity();
-        updateChatStatus(actuallyOnline);
+        const online = await checkServerConnectivity();
+        updateChatStatus(online);
         
-        if (actuallyOnline) {
-            console.log("✅ You are online now - syncing offline chat messages");
-            
-            // Sync offline chat messages
-            openSyncChatsIDB().then((db) => {
-                getAllSyncChatMessages(db).then((syncChats) => {
-                    if (syncChats.length > 0) {
-                        console.log(`📤 Found ${syncChats.length} offline chat messages to sync`);
-                        syncChats.forEach((data) => {
-                            console.log("Syncing offline chat message:", data.value);
-                            addChatToDB(data.value);
-                            deleteSyncChatFromIDB(db, data.id);
-                        });
-                    } else {
-                        console.log("No offline chat messages to sync");
-                    }
-                });
-            });
-        } else {
-            console.log("⚠️  Navigator says online but server is unreachable");
+        if (online) {
+            console.log("Connection verified - syncing messages");
+            await syncPendingMessages();
         }
     });
-
-    window.addEventListener('offline', function () {
+    
+    window.addEventListener('offline', function() {
         updateChatStatus(false);
-        console.log("❌ You are offline now");
+        console.log("Device offline");
     });
     
-    // Periodic check every 15 seconds 
+    // Periodic connectivity check
     setInterval(async () => {
-        if (navigator.onLine) { 
-            const actuallyOnline = await checkServerConnectivity();
+        if (navigator.onLine) {
+            const online = await checkServerConnectivity();
             const currentStatus = document.getElementById('chatStatusText')?.textContent === 'Online';
-            if (actuallyOnline !== currentStatus) {
-                console.log(`🔄 Chat status changed: ${currentStatus ? 'ONLINE' : 'OFFLINE'} → ${actuallyOnline ? 'ONLINE' : 'OFFLINE'}`);
-                updateChatStatus(actuallyOnline);
+            if (online !== currentStatus) {
+                updateChatStatus(online);
             }
         }
     }, 15000);
 }
 
+/**
+ * Register socket event handlers
+ */
+function registerSocket() {
+    if (!socket) {
+        setTimeout(registerSocket, 1000);
+        return;
+    }
+    
+    console.log("📡 Registering socket handlers...");
+    
+    socket.off("joined");
+    socket.off("left");
+    socket.off("chatmessage");
+    
+    socket.on("joined", function(room, userId) {
+        console.log(`User ${userId} joined room ${room}`);
+    });
+    
+    socket.on("left", function(room, userId) {
+        console.log(`User ${userId} left room ${room}`);
+    });
+    
+    socket.on("chatmessage", function(message) {
+        console.log("Received socket message:", message);
+        
+        // Normalize properties
+        if (message.chatmessage && !message.chatMessage) message.chatMessage = message.chatmessage;
+        if (message.username && !message.userName) message.userName = message.username;
+        if (message.chattime && !message.chatTime) message.chatTime = message.chattime;
+        
+        // Render only if not already rendered (prevent duplicates)
+        const messageId = message._id || message.id || `${message.userName}-${message.chatTime}`;
+        if (!renderedMessageIds.has(messageId)) {
+            renderChatMessage([message]);
+        }
+    });
+}
+
+/**
+ * Send message to server database
+ */
+async function addChatToServerDB(message) {
+    console.log("Saving to server DB:", message);
+    
+    const response = await fetch(`/api/chat/plants/${message.plantId}/messages`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            chatmessage: message.chatmessage,
+            username: message.username,
+            plantId: message.plantId,
+            chattime: message.chattime
+        })
+    });
+    
+    if (!response.ok) {
+        throw new Error(`Server error: ${response.status}`);
+    }
+    
+    const data = await response.json();
+    console.log("✅ Saved to server:", data);
+    return data;
+}
+
+/**
+ * Join plant chat room
+ */
+function joinPlantChatRoom() {
+    if (!socket || !socket.connected) {
+        console.log("⏳ Waiting for socket connection...");
+        return;
+    }
+    
+    console.log(`Joining room for plant ${plantId} as ${loggedInUser}`);
+    socket.emit("createorjoin", plantId, loggedInUser);
+}
+
+/**
+ * Get chat history
+ */
+async function getChatHistory(plantID) {
+    const container = document.getElementById("chatMessages");
+    if (!container) {
+        console.error("Chat container not found");
+        return;
+    }
+    
+    console.log("Fetching chat history...");
+    
+    const isOnline = await checkServerConnectivity();
+    
+    if (isOnline) {
+        container.innerHTML = '<div class="flex justify-center p-4"><div class="spinner"></div></div>';
+        
+        try {
+            const response = await fetch(`/api/chat/plants/${plantID}/messages`);
+            const data = await response.json();
+            chatMessages = data.messages || [];
+            
+            console.log(`Loaded ${chatMessages.length} messages from server`);
+            
+            // Cache for offline use
+            if (window.ChatDB) {
+                await window.ChatDB.cacheChatMessages(plantID, chatMessages);
+            }
+            
+            renderChatMessages(chatMessages);
+            
+        } catch (error) {
+            console.error("Server fetch failed:", error);
+            await loadCachedMessages(plantID, container);
+        }
+        
+    } else {
+        console.log("📱 Offline - loading cached messages");
+        await loadCachedMessages(plantID, container);
+    }
+}
+
+/**
+ * Load cached messages for offline viewing
+ */
+async function loadCachedMessages(plantID, container) {
+    try {
+        if (!window.ChatDB) {
+            throw new Error("ChatDB not available");
+        }
+        
+        const cached = await window.ChatDB.getCachedChatMessages(plantID);
+        
+        if (cached.length > 0) {
+            console.log(`📦 Loaded ${cached.length} cached messages`);
+            chatMessages = cached;
+            renderChatMessages(cached);
+        } else {
+            showNoMessagesUI(container);
+        }
+    } catch (error) {
+        console.error("Cache load failed:", error);
+        showNoMessagesUI(container);
+    }
+}
+
+/**
+ * Show no messages UI
+ */
+function showNoMessagesUI(container) {
+    container.innerHTML = `
+        <div class="flex flex-col items-center justify-center h-full p-4">
+            <i class="fas fa-comments text-4xl text-gray-400 mb-4"></i>
+            <p class="text-gray-600 text-center">
+                No messages yet.<br>Start the conversation!
+            </p>
+        </div>
+    `;
+}
+
+/**
+ * Render single message (append)
+ */
+function renderChatMessage(messages) {
+    const container = document.getElementById("chatMessages");
+    if (!container) return;
+    
+    messages.forEach(msg => {
+        // Check for duplicates
+        const msgId = msg._id || msg.id || msg.localId || `${msg.userName}-${msg.timestamp || msg.chatTime}`;
+        
+        if (renderedMessageIds.has(msgId)) {
+            console.log(`Skipping duplicate message: ${msgId}`);
+            return;
+        }
+        
+        // Normalize message properties
+        normalizeMessageProperties(msg);
+        
+        // Format timestamp
+        formatMessageTime(msg);
+        
+        // Create and append message div
+        const messageDiv = createChatMessageDiv(msg);
+        container.appendChild(messageDiv);
+        
+        // Track rendered message
+        renderedMessageIds.add(msgId);
+    });
+    
+    // Scroll to bottom
+    container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Render all messages (replace)
+ */
+function renderChatMessages(messages) {
+    const container = document.getElementById("chatMessages");
+    if (!container) return;
+    
+    // Clear container and tracking
+    container.innerHTML = '';
+    renderedMessageIds.clear();
+    
+    if (!messages || messages.length === 0) {
+        showNoMessagesUI(container);
+        return;
+    }
+    
+    console.log(`Rendering ${messages.length} messages`);
+    
+    messages.forEach(msg => {
+        normalizeMessageProperties(msg);
+        formatMessageTime(msg);
+        
+        const messageDiv = createChatMessageDiv(msg);
+        container.appendChild(messageDiv);
+        
+        const msgId = msg._id || msg.id || msg.localId || `${msg.userName}-${msg.timestamp}`;
+        renderedMessageIds.add(msgId);
+    });
+    
+    container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * Normalize message properties for consistency
+ */
+function normalizeMessageProperties(msg) {
+    if (msg.chatmessage && !msg.chatMessage) msg.chatMessage = msg.chatmessage;
+    if (msg.chatMessage && !msg.chatmessage) msg.chatmessage = msg.chatMessage;
+    if (msg.username && !msg.userName) msg.userName = msg.username;
+    if (msg.userName && !msg.username) msg.username = msg.userName;
+    if (msg.chattime && !msg.chatTime) msg.chatTime = msg.chattime;
+    if (msg.chatTime && !msg.chattime) msg.chattime = msg.chatTime;
+}
+
+/**
+ * Format message timestamp
+ */
+function formatMessageTime(msg) {
+    let timeToFormat = msg.chatTime || msg.chattime || msg.timestamp;
+    
+    if (!timeToFormat) {
+        msg.chatTime = 'Just now';
+        msg.chattime = 'Just now';
+        return;
+    }
+    
+    try {
+        const date = new Date(timeToFormat);
+        if (isNaN(date.getTime())) {
+            msg.chatTime = 'Just now';
+            msg.chattime = 'Just now';
+            return;
+        }
+        
+        const formatted = date.toLocaleString("en-US", {
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            hour: "numeric",
+            minute: "numeric",
+            hour12: true
+        });
+        
+        msg.chatTime = formatted;
+        msg.chattime = formatted;
+        
+        // Add pending indicator for offline messages
+        if (msg.syncStatus === 'pending') {
+            msg.chatTime += ' (Pending sync)';
+            msg.chattime += ' (Pending sync)';
+        }
+        
+    } catch (error) {
+        console.error("Error formatting time:", error);
+        msg.chatTime = 'Just now';
+        msg.chattime = 'Just now';
+    }
+}
+
+/**
+ * Create chat message div element
+ */
+function createChatMessageDiv(message) {
+    const messageDiv = document.createElement('div');
+    messageDiv.className = 'mb-4 p-3 rounded-lg';
+    
+    const isOwnMessage = message.userName === loggedInUser || message.username === loggedInUser;
+    
+    if (isOwnMessage) {
+        messageDiv.classList.add('bg-blue-100', 'ml-auto', 'max-w-[80%]');
+    } else {
+        messageDiv.classList.add('bg-gray-100', 'mr-auto', 'max-w-[80%]');
+    }
+    
+    // Add pending indicator styling
+    if (message.syncStatus === 'pending') {
+        messageDiv.classList.add('border-l-4', 'border-yellow-500', 'opacity-80');
+    }
+    
+    const userDiv = document.createElement('div');
+    userDiv.className = 'font-semibold text-sm mb-1';
+    userDiv.textContent = message.userName || message.username || 'Unknown';
+    
+    const messageText = document.createElement('div');
+    messageText.className = 'text-gray-800';
+    messageText.textContent = message.chatMessage || message.chatmessage || '';
+    
+    const timeDiv = document.createElement('div');
+    timeDiv.className = 'text-xs text-gray-500 mt-1';
+    timeDiv.textContent = message.chatTime || message.chattime || 'Just now';
+    
+    messageDiv.appendChild(userDiv);
+    messageDiv.appendChild(messageText);
+    messageDiv.appendChild(timeDiv);
+    
+    return messageDiv;
+}
+
+/**
+ * Update online status UI elements
+ */
 function changeOnlineStatus(isOnline) {
     const onlineColorDiv = document.getElementById('onlineColor');
     const onlineText = document.getElementById('onlineText');
@@ -323,13 +872,8 @@ function changeOnlineStatus(isOnline) {
             onlineColorDiv.classList.remove("bg-green-500");
             onlineColorDiv.classList.add("bg-red-500");
             
-            // Show offline info and check if user can chat
             if (offlineInfo && offlineInfoText) {
-                console.log(`🔍 Checking offline chat permissions for plant ${plantId} and user ${loggedInUser}`);
-                
                 isUserOwnPlant(plantId, loggedInUser).then(canChatOffline => {
-                    console.log(`Offline chat permission result: ${canChatOffline ? 'ALLOWED' : 'DENIED'}`);
-                    
                     if (canChatOffline) {
                         offlineInfoText.textContent = "Offline: You can still message your own plant";
                         offlineInfo.classList.remove('hidden');
@@ -342,623 +886,12 @@ function changeOnlineStatus(isOnline) {
                         offlineInfo.classList.remove('text-blue-600');
                     }
                 }).catch(error => {
-                    console.error('Error checking plant ownership for offline info:', error);
+                    console.error('Error checking ownership:', error);
                     offlineInfoText.textContent = "Offline: Limited chat functionality";
                     offlineInfo.classList.remove('hidden');
-                    offlineInfo.classList.add('text-yellow-600');
-                    offlineInfo.classList.remove('text-blue-600', 'text-red-600');
                 });
             }
         }
     }
 }
 
-function registerFormSubmit() {
-    const chatForm = document.getElementById("chatForm");
-    if (chatForm) {
-        chatForm.addEventListener("submit", function (event) {
-            event.preventDefault(); 
-            sendMessage();
-        });
-    } else {
-        console.error("Chat form not found!");
-    }
-}
-
-async function sendMessage(isSuggestingName = false) {
-    var input = document.getElementById("chatInput");
-    if (!input || input.value.trim() === "") {
-        return;
-    }
-    
-    var chatMessage = {
-        chatmessage: input.value.trim(),
-        chatMessage: input.value.trim(),  
-        username: loggedInUser,
-        userName: loggedInUser,  
-        plantId: plantId,
-        chattime: new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
-        chatTime: new Date().toISOString().replace(/T/, ' ').replace(/\..+/, ''),
-    };
-
-    // Check actual connectivity
-    const isActuallyOnline = navigator.onLine && await checkServerConnectivity();
-    
-    if (isActuallyOnline) {
-        input.value = ""; 
-        console.log("Sending chat message (online):", chatMessage);
-        
-        addChatToDB(chatMessage);
-        socket.emit("chat", chatMessage);
-    } else {
-        console.log(`🔴 Offline mode detected. Checking if user ${loggedInUser} owns plant ${plantId}...`);
-        
-        const canChatOffline = await isUserOwnPlant(plantId, loggedInUser);
-        console.log(`Offline chat permission result: ${canChatOffline ? 'ALLOWED' : 'DENIED'}`);
-        
-        if (canChatOffline) {
-            input.value = ""; 
-            console.log("📱 Adding offline message to user's own plant:", chatMessage);
-            
-            try {
-                chatMessage.__offlineCreated = true;
-                chatMessage.__syncStatus = 'pending';
-                chatMessage.__timestamp = Date.now();
-                
-                const db = await getChatDatabase(); 
-                
-                // Store in pending sync
-                await addNewChatToSync(db, chatMessage);
-                console.log("📦 Chat message queued for sync");
-                
-                try {
-                    const cachedMessages = await getCachedChatMessages(plantId);
-                    cachedMessages.push(chatMessage);
-                    await cacheChatMessages(plantId, cachedMessages);
-                    console.log("📦 Updated offline chat cache with new message");
-                } catch (cacheError) {
-                    console.error("❌ Error updating chat cache:", cacheError);
-                }
-                
-                // Display message immediately for offline use
-                console.log("📱 Displaying offline message in UI...");
-                renderChatMessage([chatMessage]);
-                console.log("✅ Offline message displayed successfully");
-                
-            } catch (error) {
-                console.error("❌ Error saving offline message:", error);
-                if (typeof showNotification === 'function') {
-                    showNotification("Failed to save your message for later sync. Please try again.", 'error');
-                } else {
-                    alert("Failed to save your message for later sync. Please try again.");
-                }
-            }
-        } else {
-            console.log(`❌ User ${loggedInUser} cannot send messages to plant ${plantId} in offline mode`);
-            
-            if (typeof showNotification === 'function') {
-                showNotification("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.", 'warning');
-            } else {
-                alert("⚠️ Offline Mode Restriction\n\nYou can only send messages to plants that you added when offline.\n\nPlease connect to the internet to chat about all plants.");
-            }
-            return;
-        }
-    }
-}
-
-// Function to check if the current plant belongs to the logged-in user
-async function isUserOwnPlant(plantId, username) {
-    try {
-        // First try to check online if we have connectivity
-        if (navigator.onLine) {
-            try {
-                const response = await fetch(`/plantDetails/checkOwnership/${plantId}/${username}`);
-                if (response.ok) {
-                    const data = await response.json();
-                    console.log(`🌐 Server ownership check for plant ${plantId}: ${data.isOwner ? 'OWNED' : 'NOT OWNED'}`);
-                    return data.isOwner;
-                }
-            } catch (serverError) {
-                console.log('Server ownership check failed, falling back to offline cache:', serverError.message);
-            }
-        }
-        
-        // Fallback to offline IndexedDB check
-        try {
-            console.log(`📱 Checking offline plant ownership for plant: ${plantId}, user: ${username}`);
-            
-            // Check in the main plants database first
-            const db = await openSyncPlantIDB();
-            const plants = await getAllSyncPlants(db);
-            
-            console.log(`Found ${plants.length} plants in offline storage`);
-            
-            const ownedPlant = plants.find(p => {
-                const plantData = p.value || p;
-                const plantIdMatch = (plantData._id === plantId || plantData.id === plantId || p.id === plantId);
-                const userMatch = (plantData.nickname === username || plantData.username === username || plantData.addedBy === username);
-                
-                console.log(`Checking plant ${plantData._id || plantData.id || p.id}: ID match: ${plantIdMatch}, User match: ${userMatch}`);
-                console.log(`Plant data:`, { id: plantData._id || plantData.id, nickname: plantData.nickname, username: plantData.username, addedBy: plantData.addedBy });
-                
-                return plantIdMatch && userMatch;
-            });
-            
-            const isOwned = !!ownedPlant;
-            console.log(`📦 Offline ownership check result: ${isOwned ? 'OWNED' : 'NOT OWNED'}`);
-            
-            if (isOwned) {
-                console.log(`✅ User ${username} owns plant ${plantId} (offline verification)`);
-            } else {
-                console.log(`❌ User ${username} does not own plant ${plantId} (offline verification)`);
-            }
-            
-            return isOwned;
-            
-        } catch (idbError) {
-            console.error('IndexedDB fallback failed:', idbError);
-            // If we can't check ownership offline, be conservative and return false
-            return false;
-        }
-    } catch (error) {
-        console.error("Error checking plant ownership:", error);
-        return false; 
-    }
-}
-
-// Placeholder functions for plant IndexedDB operations
-async function openSyncPlantIDB() {
-    return new Promise((resolve, reject) => {
-        const request = indexedDB.open('plants', 1);
-        
-        request.onerror = function (event) {
-            reject(new Error(`Database error: ${event.target}`));
-        };
-        
-        request.onupgradeneeded = function (event) {
-            const db = event.target.result;
-            if (!db.objectStoreNames.contains('plants')) {
-                db.createObjectStore('plants', {
-                    keyPath: 'id',
-                    autoIncrement: true,
-                });
-            }
-        };
-        
-        request.onsuccess = function (event) {
-            const db = event.target.result;
-            resolve(db);
-        };
-    });
-}
-
-async function getAllSyncPlants(db) {
-    return new Promise((resolve, reject) => {
-        const transaction = db.transaction(['plants'], 'readonly');
-        const store = transaction.objectStore('plants');
-        const request = store.getAll();
-        
-        request.onsuccess = function() {
-            resolve(request.result || []);
-        };
-        
-        request.onerror = function() {
-            reject(request.error);
-        };
-    });
-}
-
-function registerSocket() {
-    // Make sure socket exists before registering events
-    if (!socket) {
-        console.error("Cannot register socket events - socket not initialized");
-        setTimeout(registerSocket, 1000); 
-        return;
-    }
-    
-    console.log("🔄 Registering socket event handlers...");
-    
-    // Remove any existing handlers to avoid duplicates
-    socket.off("joined");
-    socket.off("left");
-    socket.off("chatmessage");
-    
-    // Now register the event handlers
-    socket.on("joined", function (room, userId, totalUsers) {
-        if (userId === loggedInUser) {
-            console.log("You joined the room");
-        } else {
-            console.log("Someone joined the room");
-        }
-    });
-
-    socket.on("left", function (room, userId, totalUsers) {
-        console.log("user" + userId + " left the room: " + room);
-    });
-
-    socket.on("chatmessage", function (message) {
-        console.log("🎯 Received chat message via socket:", message);
-        console.log("🎯 Message properties:", Object.keys(message));
-        
-        // Normalize the message properties
-        if (message.chatmessage && !message.chatMessage) message.chatMessage = message.chatmessage;
-        if (message.chatMessage && !message.chatmessage) message.chatmessage = message.chatMessage;
-        if (message.username && !message.userName) message.userName = message.username;
-        if (message.userName && !message.username) message.username = message.userName;
-        if (message.chattime && !message.chatTime) message.chatTime = message.chattime;
-        if (message.chatTime && !message.chattime) message.chattime = message.chatTime;
-        
-        console.log("Normalized message:", message);
-        
-        // Render message only once
-        renderChatMessage([message]);
-    });
-}
-
-function addChatToDB(message) {
-    console.log("Sending message to database:", message);
-    
-    const chatEndpoint = `/api/chat/plants/${message.plantId}/messages`;
-    console.log("Using endpoint:", chatEndpoint);
-    
-    fetch(chatEndpoint, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            chatmessage: message.chatmessage,
-            username: message.username,
-            plantId: message.plantId,
-            chattime: message.chattime
-        })
-    })
-    .then(response => {
-        console.log("Chat response status:", response.status);
-        return response.json();
-    })
-    .then(data => {
-        if (data.success) {
-            console.log('✅ Chat message saved to database:', data);
-        } else {
-            console.error('❌ Failed to save chat message:', data);
-        }
-    })
-    .catch(error => {
-        console.error('❌ Error saving chat message:', error);
-    });
-}
-
-function joinPlantChatRoom() {
-    console.log("Joining plant chat room:");
-    if (typeof plantId === 'undefined') {
-        console.error('plantId is not defined');
-        return;
-    }
-    
-    if (!socket || !socket.connected) {
-        console.log('Socket not connected, waiting...');
-        // Wait for socket to connect
-        if (socket) {
-            socket.on('connect', function() {
-                console.log('Socket connected, now joining room');
-                var roomNo = plantId;
-                var name = loggedInUser;
-                socket.emit("createorjoin", roomNo, name);
-            });
-        }
-        return;
-    }
-    
-    var roomNo = plantId;
-    var name = loggedInUser;
-    console.log(`Joining room ${roomNo} as ${name}`);
-    socket.emit("createorjoin", roomNo, name);
-}
-
-/**
- * Format plant name with title case (first letter of each word capitalized)
- * @param {string} name - Plant name to format
- * @returns {string} Formatted plant name
- */
-function formatPlantName(name) {
-    if (!name) return '';
-    return name.split(' ')
-        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
-        .join(' ');
-}
-
-/**
- * Process plant form submission.
- */
-
-async function getChatHistory(plantID) {
-    let messageContainer = document.getElementById("chatMessages");
-    
-    if (!messageContainer) {
-        console.error("❌ Chat container not found! Looking for element with ID 'chatMessages'");
-        return;
-    }
-    
-    console.log("Fetching chat history for plant:", plantID);
-    
-    // First check if we're online
-    const isOnline = await checkServerConnectivity();
-    
-    // Only show loading spinner if we're online and attempting server fetch
-    if (isOnline) {
-        messageContainer.innerHTML = `
-            <div class="flex justify-center items-center p-4">
-                <div class="spinner"></div>
-                <span class="ml-2">Loading messages...</span>
-            </div>
-        `;
-    }
-    if (isOnline) {
-        console.log("🌐 Online - fetching chat messages from server");
-        
-        // Fetch chat messages from the server
-        fetch(`/api/chat/plants/${plantID}/messages`)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`HTTP error ${response.status}`);
-                }
-                return response.json();
-            })
-            .then(async data => {
-                chatMessages = data.messages;
-                console.log(`✅ Received ${chatMessages.length} messages from server`);
-                
-                // Cache messages for offline viewing
-                try {
-                    await cacheChatMessages(plantID, chatMessages);
-                    console.log("📦 Successfully cached chat messages for offline use");
-                } catch (error) {
-                    console.warn("⚠️ Failed to cache chat messages:", error);
-                }
-                
-                renderChatMessages(chatMessages);
-            })
-            .catch(async error => {
-                console.error("❌ Error fetching chat history:", error);
-                // Try to load from cache if server request fails
-                try {
-                    const cachedMessages = await getCachedChatMessages(plantID);
-                    if (cachedMessages.length > 0) {
-                        console.log(`📦 Using ${cachedMessages.length} cached messages`);
-                        chatMessages = cachedMessages;
-                        renderChatMessages(chatMessages);
-                    } else {
-                        await showOfflineMessage(messageContainer);
-                    }
-                } catch (cacheError) {
-                    console.error("❌ Error retrieving cached messages:", cacheError);
-                    await showOfflineMessage(messageContainer);
-                }
-            });
-    } else {
-        console.log("🔴 Offline - checking for cached messages");
-        
-        // Try to load from cache since we're offline
-        try {
-            const cachedMessages = await getCachedChatMessages(plantID);
-            if (cachedMessages.length > 0) {
-                console.log(`📦 Using ${cachedMessages.length} cached messages (offline)`);
-                chatMessages = cachedMessages;
-                renderChatMessages(chatMessages);
-            } else {
-                console.log("No cached messages found, showing offline message");
-                await showOfflineMessage(messageContainer);
-            }
-        } catch (error) {
-            console.error("❌ Error retrieving cached messages:", error);
-            await showOfflineMessage(messageContainer);
-        }
-    }
-}
-
-async function showOfflineMessage(container) {
-    const isOnline = typeof checkServerConnectivity === 'function' 
-        ? await checkServerConnectivity() 
-        : navigator.onLine;
-    
-    let message, iconClass, iconName;
-    
-    if (isOnline) {
-        message = 'No messages yet. Be the first to start the conversation!';
-        iconClass = 'text-blue-500';
-        iconName = 'fa-comments';
-    } else {
-        // Check if this is the user's own plant to customize message
-        const canChatOffline = await isUserOwnPlant(plantId, loggedInUser);
-        
-        if (canChatOffline) {
-            message = "You're offline, but you can still chat with your own plant. Messages will sync when you're back online.";
-            iconClass = 'text-blue-500';
-            iconName = 'fa-wifi';
-        } else {
-            message = "You're offline. No cached messages available for this plant.";
-            iconClass = 'text-yellow-500';
-            iconName = 'fa-exclamation-circle';
-        }
-    }
-    
-    container.innerHTML = `
-        <div class="p-4 text-center">
-            <div class="${iconClass}">
-                <i class="fas ${iconName} text-xl"></i>
-            </div>
-            <p class="mt-2 text-gray-600">
-                ${message}
-            </p>
-        </div>
-    `;
-}
-
-function renderChatMessage(messages) {
-    // Function to render new messages without clearing existing ones
-    try {
-        const chatContainer = document.getElementById("chatMessages");
-        if (!chatContainer) {
-            console.error("❌ Chat container not found! Looking for element with ID 'chatMessages'");
-            // Try to find any chat container as a fallback
-            const possibleContainers = document.querySelectorAll('.chat-container, .message-container');
-            if (possibleContainers.length > 0) {
-                console.log("Found possible alternative container:", possibleContainers[0]);
-                chatContainer = possibleContainers[0];
-            } else {
-                console.error("No chat container alternatives found. Cannot render messages.");
-                return;
-            }
-        }
-
-        console.log("🟢 Rendering new chat message:", messages);
-        console.log("🔢 Number of messages to render:", messages.length);
-
-        // Remove no messages div if present
-        const noMessagesDiv = document.getElementById("noMessagesDiv");
-        if (noMessagesDiv) {
-            chatContainer.removeChild(noMessagesDiv);
-        }
-
-        messages.forEach((message, index) => {
-            console.log(`Processing message ${index}:`, message);
-            
-            // Ensure consistent property names
-            if (!message.username && message.userName) message.username = message.userName;
-            if (!message.userName && message.username) message.userName = message.username;
-            if (!message.chatMessage && message.chatmessage) message.chatMessage = message.chatmessage;
-            if (!message.chatmessage && message.chatMessage) message.chatmessage = message.chatMessage;
-            
-            if (message.chatTime && !message.chatTime.includes(',')) {
-            } else if (message.chattime || message.chatTime) {
-                let chatTime = new Date(message.chattime || message.chatTime);
-                if (!isNaN(chatTime.getTime())) {
-                    let formattedChatTime = chatTime.toLocaleString("en-US", {
-                        month: "long",
-                        day: "numeric", 
-                        year: "numeric",
-                        hour: "numeric",
-                        minute: "numeric",
-                        hour12: true,
-                    });
-                    message.chatTime = formattedChatTime;
-                    message.chattime = formattedChatTime;
-                } else {
-                    message.chatTime = message.chattime || message.chatTime || 'Just now';
-                }
-            } else {
-                let chatTime = new Date();
-                let formattedChatTime = chatTime.toLocaleString("en-US", {
-                    month: "long",
-                    day: "numeric", 
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "numeric",
-                    hour12: true,
-                });
-                message.chatTime = formattedChatTime;
-                message.chattime = formattedChatTime;
-            }
-            
-            console.log("About to create chat message div for:", message);
-            
-            const chatMessageDiv = createChatMessageDiv(message);
-            console.log("Created chat message div:", chatMessageDiv);
-            chatContainer.appendChild(chatMessageDiv);
-        });
-
-        // Scroll to the bottom of the chat container
-        chatContainer.scrollTop = chatContainer.scrollHeight;
-    } catch (error) {
-        console.error("Error rendering chat message:", error);
-        console.error("Stack trace:", error.stack);
-    }
-}
-
-function renderChatMessages(messages) {
-    try {
-        const chatContainer = document.getElementById("chatMessages");
-        if (!chatContainer) {
-            console.error("Chat container not found!");
-            return;
-        }
-
-        console.log("Rendering chat messages:", messages);
-
-        // Clear no messages div if present
-        const noMessagesDiv = document.getElementById("noMessagesDiv");
-        if (noMessagesDiv) {
-            chatContainer.removeChild(noMessagesDiv);
-        }
-
-        if (!messages || messages.length === 0) {
-            const noMessagesDiv = document.createElement("div");
-            noMessagesDiv.id = "noMessagesDiv";
-            noMessagesDiv.classList.add(
-                "flex",
-                "flex-col",
-                "w-full",
-                "h-full",
-                "items-center",
-                "place-content-center",
-            );
-
-            const noMessagesImg = document.createElement("img");
-            noMessagesImg.src = "/images/chat.jpg";
-            noMessagesImg.classList.add("w-80");
-
-            const noMessagesText = document.createElement("div");
-            noMessagesText.classList.add("text-lg", "text-gray-500", "text-center");
-            noMessagesText.innerHTML = "No messages yet <br> Start the conversation!";
-            
-            noMessagesDiv.appendChild(noMessagesImg);
-            noMessagesDiv.appendChild(noMessagesText);
-            chatContainer.appendChild(noMessagesDiv);
-        } else {
-            // Clear the chat container first to prevent duplicate messages
-            chatContainer.innerHTML = '';
-            
-            messages.forEach((message) => {
-                // Ensure consistent property names
-                if (message.chatmessage && !message.chatMessage) message.chatMessage = message.chatmessage;
-                if (message.chatMessage && !message.chatmessage) message.chatmessage = message.chatMessage;
-                if (message.username && !message.userName) message.userName = message.username;
-                if (message.userName && !message.username) message.username = message.userName;
-                
-                // Handle both chattime and chatTime formats
-                let chatTime;
-                if (message.chattime || message.chatTime) {
-                    chatTime = new Date(message.chattime || message.chatTime);
-                } else {
-                    // If no timestamp, use current time
-                    chatTime = new Date();
-                }
-                
-                let formattedChatTime = chatTime.toLocaleString("en-US", {
-                    month: "long",
-                    day: "numeric",
-                    year: "numeric",
-                    hour: "numeric",
-                    minute: "numeric",
-                    hour12: true,
-                });
-                
-                message.chatTime = formattedChatTime;
-                message.chattime = formattedChatTime;
-                
-                console.log("Rendering message with properties:", Object.keys(message));
-                console.log("Message content:", message.chatMessage || message.chatmessage);
-                console.log("Message user:", message.username || message.userName);
-                
-                const chatMessageDiv = createChatMessageDiv(message);
-                chatContainer.appendChild(chatMessageDiv);
-            });
-
-            // Scroll to the bottom of the chat container
-            chatContainer.scrollTop = chatContainer.scrollHeight;
-        }
-    } catch (error) {
-        console.error("Error rendering chat messages:", error.message);
-    }
-}

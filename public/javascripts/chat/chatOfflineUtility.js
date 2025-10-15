@@ -117,7 +117,7 @@ const addMessageToPendingSync = async (message) => {
         const pendingStore = syncTx.objectStore(SYNC_CHAT_STORE);
         const syncRequest = pendingStore.add(message);
         
-        // Also add to regular messages for display
+        // Add to regular messages for display
         const messagesStore = syncTx.objectStore(CHAT_MESSAGES_STORE);
         messagesStore.add(message);
         

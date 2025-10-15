@@ -15,61 +15,78 @@
  * - Normal: Gray counter (0-300 chars)
  * - Warning: Yellow counter (301-400 chars)
  * - Critical: Red counter (401-500 chars)
- * 
- * Styling:
- * - Custom placeholder color
- * - Focus state handling
- * - Rounded corners
- * - Consistent spacing
  */
 %>
 
+<link rel="stylesheet" href="/output/input.css">
 <div class="p-4 flex items-center gap-3">
     <div class="flex-1 relative">
         <input
             type="text" 
-            name="text" 
+            name="message"
             placeholder="Type your message here" 
             class="w-full px-4 py-2 text-base rounded-md focus:outline-none bg-white border border-gray-300"
             id="chatInput"
             maxlength="500"
             required
+            autocomplete="off"
         />
+        <div class="absolute right-2 top-1/2 transform -translate-y-1/2 text-xs">
+            <span id="charCounter" class="text-gray-400">0</span>
+            <span class="text-gray-400">/500</span>
+        </div>
     </div>
     <button 
         type="submit"
-        class="px-4 py-2 bg-[#6B46C1] text-white text-lg rounded-r hover:bg-[#553C9A] focus:outline-none rounded-full flex items-center justify-center"
+        class="px-6 py-2 bg-[#6B46C1] text-white text-base rounded-full hover:bg-[#553C9A] focus:outline-none transition-colors duration-200 flex items-center justify-center font-medium"
         style="background-color: #6B46C1;"
+        id="sendButton"
     >
         Send
     </button>
 </div>
-    
-<style>
-    #chatInput::placeholder {
-        color: #9ca3af;
-    }
-    
-    #chatInput:focus {
-        background-color: white;
-    }
-</style>
-
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const chatInput = document.getElementById('chatInput');
         const charCounter = document.getElementById('charCounter');
+        const sendButton = document.getElementById('sendButton');
         
         if (chatInput && charCounter) {
+            // Update character counter
             chatInput.addEventListener('input', function() {
-                charCounter.textContent = this.value.length;
+                const length = this.value.length;
+                charCounter.textContent = length;
                 
-                if (this.value.length > 400) {
-                    charCounter.style.color = '#ef4444'; 
-                } else if (this.value.length > 300) {
-                    charCounter.style.color = '#f59e0b'; 
+                // Color feedback based on character count
+                if (length > 400) {
+                    charCounter.style.color = '#ef4444'; // Red
+                } else if (length > 300) {
+                    charCounter.style.color = '#f59e0b'; // Yellow
                 } else {
-                    charCounter.style.color = '#9ca3af'; 
+                    charCounter.style.color = '#9ca3af'; // Gray
+                }
+                
+                // Disable send button if empty
+                if (sendButton) {
+                    sendButton.disabled = length === 0;
+                }
+            });
+            
+            // Initial state
+            if (sendButton) {
+                sendButton.disabled = true;
+            }
+        }
+        
+        // Add enter key support (without shift)
+        if (chatInput) {
+            chatInput.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    const form = this.closest('form');
+                    if (form && this.value.trim()) {
+                        form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+                    }
                 }
             });
         }
