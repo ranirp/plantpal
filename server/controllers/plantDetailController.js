@@ -46,7 +46,7 @@ exports.plantDetailPage = async (req, res) => {
             console.log('Rendering offline plant detail page for:', plantId);
             // Render the plant details page but with offline mode enabled
             // The frontend will load the plant data from IndexedDB
-            return res.render('details/plantDetails', { 
+            return res.render('plantdetails/plantDetails', { 
                 title: 'Plant Details (Offline)',
                 data: { 
                     _id: plantId,
@@ -72,7 +72,7 @@ exports.plantDetailPage = async (req, res) => {
 
         console.log('Rendering plant detail page for plant:', plant.plantName);
 
-        res.render('details/plantDetails', { 
+    res.render('plantdetails/plantDetails', { 
             title: `${plant.plantName} - Plant Details`,
             data: plant,
             username: userName,
