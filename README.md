@@ -264,7 +264,7 @@ The app can be installed as a Progressive Web App:
 
 ![App Plant Form](public/assets/AddPlantform.png)
 
-![Chat](public/assets/No-Chat.png)
+![Chat](public/assets/No-chat.png)
 
 ![Chat Online](public/assets/Chat-Online.png)
 
