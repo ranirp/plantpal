@@ -45,3 +45,146 @@
 p {
     @apply leading-[1.6];
 }
+
+/* Chat-specific styles */
+.messenger-bubble {
+    animation: fadeInUp 0.3s ease-out;
+    word-wrap: break-word;
+    word-break: break-word;
+}
+
+.messenger-bubble:hover {
+    transform: translateY(-1px);
+    transition: transform 0.2s ease;
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+/* Custom scrollbar for chat */
+#chatMessages::-webkit-scrollbar { width: 6px; }
+#chatMessages::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 3px; }
+#chatMessages::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 3px; }
+#chatMessages::-webkit-scrollbar-thumb:hover { background: #a1a1a1; }
+
+/* Speech bubble tails */
+.message-bubble-left::after {
+    content: "";
+    position: absolute;
+    left: -7px;
+    bottom: 6px;
+    width: 0; height: 0;
+    border: 10px solid transparent;
+    border-right-color: #e5e7eb;
+    border-left: 0; border-bottom: 0;
+    margin-bottom: -1px;
+}
+
+.message-bubble-right::after {
+    content: "";
+    position: absolute;
+    right: -7px;
+    bottom: 6px;
+    width: 0; height: 0;
+    border: 10px solid transparent;
+    border-left-color: #8b5cf6;
+    border-right: 0; border-bottom: 0;
+    margin-bottom: -1px;
+}
+
+/* Add Plant page layout overrides (responsive + PWA safe-area) */
+body.add-plant-page {
+    margin: 0; padding: 0; background: #f9fafb;
+    min-height: 100vh; min-height: 100dvh; width: 100%; overflow-x: hidden;
+}
+
+html.add-plant-root { height: -webkit-fill-available; }
+
+.form-container {
+    width: 100%; max-width: 1200px; display: grid; grid-template-columns: 1fr 1fr; gap: 2rem;
+    background: white; border-radius: 1rem; box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    overflow: hidden; margin: auto;
+}
+
+.illustration-side {
+    display:flex; align-items:center; justify-content:center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 2rem;
+}
+.illustration-side img{ max-width:100%; height:auto; object-fit:contain; border-radius:0.5rem; }
+
+.form-side{ padding:2rem; overflow-y:auto; max-height:85vh; max-height:85dvh; }
+
+@media (max-width: 768px) {
+    .form-container { grid-template-columns: 1fr; max-height: none; }
+    .illustration-side { display: none; }
+    .form-side { max-height: none; padding: 1.5rem; }
+    .add-plant-page { padding: 0.5rem; align-items: flex-start; padding-top: 2rem; }
+}
+
+@supports (padding: env(safe-area-inset-top)) {
+    .add-plant-page {
+        padding-top: max(1rem, env(safe-area-inset-top));
+        padding-bottom: max(1rem, env(safe-area-inset-bottom));
+        padding-left: max(1rem, env(safe-area-inset-left));
+        padding-right: max(1rem, env(safe-area-inset-right));
+    }
+}
+
+/* Image loading improvements */
+.object-contain 
+{ 
+    object-fit: contain; 
+    object-position: center; 
+}
+.object-cover-alt { 
+    object-fit: cover; 
+    object-position: center; 
+}
+img 
+{ 
+    transition: 
+    opacity 0.3s ease-in-out; 
+}
+img[loading="lazy"] { 
+    opacity: 0; 
+}
+img[loading="lazy"].loaded, 
+img:not([loading="lazy"]) { 
+    opacity: 1; 
+}
+figure img { 
+    display: block; 
+    max-width: 100%; 
+    height: auto; 
+}
+.aspect-\[4\/3\] { 
+    aspect-ratio: 4/3; 
+}
+@supports not (aspect-ratio: 4 / 3) {
+    .aspect-\[4\/3\] { 
+        position: relative; 
+        padding-bottom: 75%; 
+    }
+    .aspect-\[4\/3\] img { 
+        position: absolute; 
+        top: 0; 
+        left: 0; 
+        width: 100%; 
+        height: 100%; 
+    }
+}
+
+/* Ensure .prose always inherits the container's text color and background */
+.prose { 
+    color: inherit !important; 
+    background-color: inherit !important; 
+}
+
+/* Small accessibility/fallback fixes */
+.flex.flex-col.h-screen { 
+    min-height: 100vh; 
+    min-height: -webkit-fill-available; 
+}
