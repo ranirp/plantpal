@@ -84,7 +84,7 @@ self.addEventListener("install", (event) => {
                 "/javascripts/chat/chatOfflineUtility.js",
                 
                 // Details scripts
-                "/javascripts/details/plantDetailsScript.js",
+                "/javascripts/plantdetail/plantDetailsScript.js",
                 
                 // User scripts
                 "/javascripts/user/userScript.js",
